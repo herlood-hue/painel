@@ -1,17 +1,39 @@
+Separacao online · HTML
+Copiar
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0f1117">
+<meta name="theme-color" content="#f5f7fa" id="themeColorMeta">
 <title>📦 Separação Online</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ══════════════════════════════════════════
-   TOKENS
+   TOKENS — LIGHT (padrão)
 ══════════════════════════════════════════ */
 :root {
+  --bg:   #f5f7fa; --bg2: #ffffff; --bg3: #eef1f6; --bg4: #e2e8f2;
+  --border: #d1d9e6; --border2: #b8c4d8;
+  --text: #1a2236; --text2: #4a5f7a; --text3: #8899bb;
+  --accent: #3a72e0; --accent2: #2a5cc8;
+  --green: #1faa6e; --green2: #178a58;
+  --red: #d94040;   --yellow: #b87b00;
+  --sh: #e05800; --ml: #a07000; --az: #2a5cc8; --ev: #1a8a4a;
+  --font: 'Sora', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --r: 12px;
+  --items-bg: rgba(0,0,0,.04);
+  --pick-done-bg: rgba(31,170,110,.04);
+  --pick-active-bg: rgba(58,114,224,.06);
+}
+ 
+/* ══════════════════════════════════════════
+   TOKENS — DARK
+══════════════════════════════════════════ */
+body.dark {
   --bg:   #0f1117; --bg2: #161b27; --bg3: #1e2535; --bg4: #252d3d;
   --border: #2a3347; --border2: #344060;
   --text: #e8edf5; --text2: #8899bb; --text3: #4f617a;
@@ -19,13 +41,13 @@
   --green: #34c78a; --green2: #28a573;
   --red: #f05c5c;   --yellow: #f0b429;
   --sh: #f97316; --ml: #facc15; --az: #60a5fa; --ev: #4ade80;
-  --font: 'Sora', sans-serif;
-  --mono: 'JetBrains Mono', monospace;
-  --r: 12px;
+  --items-bg: rgba(0,0,0,.15);
+  --pick-done-bg: rgba(52,199,138,.03);
+  --pick-active-bg: rgba(79,142,247,.06);
 }
-
+ 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
+ 
 html { height: 100%; }
 body {
   height: 100%;
@@ -35,7 +57,7 @@ body {
   overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
 }
-
+ 
 /* ══════════════════════════════════════════
    SCREENS
 ══════════════════════════════════════════ */
@@ -46,7 +68,7 @@ body {
   overflow: hidden;
 }
 .screen.active { display: flex; }
-
+ 
 /* ══════════════════════════════════════════
    LOADING
 ══════════════════════════════════════════ */
@@ -89,7 +111,7 @@ body {
   border-radius: 4px;
   font-size: .78rem;
 }
-
+ 
 /* ══════════════════════════════════════════
    SHARED HEADER
 ══════════════════════════════════════════ */
@@ -125,7 +147,7 @@ body {
   font-family: var(--mono);
 }
 .header-right { display: flex; align-items: center; gap: .55rem; flex-shrink: 0; }
-
+ 
 .progress-pill {
   background: var(--bg3);
   border: 1px solid var(--border2);
@@ -138,7 +160,7 @@ body {
   white-space: nowrap;
 }
 .progress-pill.done { border-color: var(--green2); color: var(--green); background: rgba(52,199,138,.08); }
-
+ 
 .live-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
@@ -149,7 +171,7 @@ body {
 .live-dot.offline { background: var(--red); animation: none; }
 .live-dot.syncing { background: var(--yellow); }
 @keyframes livepulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-
+ 
 .icon-btn {
   background: var(--bg3);
   border: 1px solid var(--border);
@@ -165,12 +187,12 @@ body {
 }
 .icon-btn:hover { background: var(--bg4); color: var(--text); }
 .icon-btn:active { transform: scale(.95); }
-
+ 
 /* ══════════════════════════════════════════
    EMPLOYEE SCREEN
 ══════════════════════════════════════════ */
 #sEmployee { background: var(--bg); }
-
+ 
 .emp-scroll {
   flex: 1;
   overflow-y: auto;
@@ -183,7 +205,7 @@ body {
   gap: .6rem;
   padding-bottom: 5rem; /* space for banner */
 }
-
+ 
 /* ── SITE BLOCK ── */
 .site-block {
   background: var(--bg2);
@@ -206,7 +228,7 @@ body {
   font-family: var(--mono);
   color: var(--text3);
 }
-
+ 
 /* ── ORDER ROW ── */
 .order-row {
   border-top: 1px solid var(--border);
@@ -215,7 +237,7 @@ body {
   user-select: none;
 }
 .order-row:first-of-type { border-top: none; }
-
+ 
 .order-hdr {
   padding: .65rem .9rem;
   display: flex;
@@ -224,7 +246,7 @@ body {
   transition: background .1s;
 }
 .order-row:active .order-hdr { background: var(--bg4); }
-
+ 
 /* Progress Ring */
 .ring-wrap {
   flex-shrink: 0;
@@ -251,7 +273,7 @@ body {
 }
 .order-row.fully-done .ring-fg { stroke: var(--green); }
 .order-row.fully-done .ring-label { color: var(--green); }
-
+ 
 .order-info { flex: 1; min-width: 0; }
 .order-id-text {
   font-size: .72rem;
@@ -284,7 +306,7 @@ body {
   letter-spacing: .03em;
 }
 .order-row.fully-done .order-done-badge { display: inline-block; }
-
+ 
 .order-chevron {
   font-size: .9rem;
   color: var(--text3);
@@ -292,15 +314,15 @@ body {
   flex-shrink: 0;
 }
 .order-row.open .order-chevron { transform: rotate(90deg); }
-
+ 
 /* ── ITEM LIST ── */
 .order-items {
   display: none;
   flex-direction: column;
-  background: rgba(0,0,0,.15);
+  background: var(--items-bg);
 }
 .order-row.open .order-items { display: flex; }
-
+ 
 .pick-item {
   display: flex;
   align-items: flex-start;
@@ -313,9 +335,9 @@ body {
   user-select: none;
   min-height: 62px;
 }
-.pick-item:active { background: rgba(79,142,247,.06); }
-.pick-item.done { background: rgba(52,199,138,.03); }
-
+.pick-item:active { background: var(--pick-active-bg); }
+.pick-item.done { background: var(--pick-done-bg); }
+ 
 .pick-cb {
   flex-shrink: 0;
   width: 28px; height: 28px;
@@ -332,7 +354,7 @@ body {
   border-color: var(--green);
   box-shadow: 0 2px 8px rgba(52,199,138,.35);
 }
-
+ 
 .pick-text { flex: 1; min-width: 0; }
 .pick-nome {
   font-size: .85rem;
@@ -352,7 +374,7 @@ body {
   margin-top: .25rem;
 }
 .pick-loc.has-loc { color: var(--accent); }
-
+ 
 /* ── ALL DONE ── */
 .all-done {
   position: fixed;
@@ -375,12 +397,12 @@ body {
   display: block;
   transform: translateX(-50%) translateY(0);
 }
-
+ 
 /* ══════════════════════════════════════════
    ADMIN SCREEN
 ══════════════════════════════════════════ */
 #sAdmin { background: var(--bg); }
-
+ 
 .admin-scroll {
   flex: 1;
   overflow-y: auto;
@@ -394,7 +416,7 @@ body {
   max-width: 720px;
   margin: 0 auto;
 }
-
+ 
 /* ── BIG PROGRESS ── */
 .big-progress {
   background: var(--bg2);
@@ -454,7 +476,7 @@ body {
   margin-top: .55rem;
   text-align: right;
 }
-
+ 
 /* ── SITE CARD ── */
 .admin-site {
   background: var(--bg2);
@@ -489,7 +511,7 @@ body {
   color: var(--text3);
   white-space: nowrap;
 }
-
+ 
 /* ── ORDER STATUS ROWS ── */
 .admin-order {
   display: flex;
@@ -534,14 +556,33 @@ body {
 .badge-done    { background: rgba(52,199,138,.15); color: var(--green); }
 .badge-partial { background: rgba(240,180,41,.12); color: var(--yellow); }
 .badge-pending { background: var(--bg4); color: var(--text3); }
-
+ 
+/* ══════════════════════════════════════════
+   THEME TOGGLE
+══════════════════════════════════════════ */
+.theme-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  border-radius: 7px;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .95rem;
+  cursor: pointer;
+  transition: all .15s;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.theme-btn:hover { background: var(--bg4); color: var(--text); }
+.theme-btn:active { transform: scale(.92); }
+ 
 /* ══════════════════════════════════════════
    SCROLLBAR
 ══════════════════════════════════════════ */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-
+ 
 /* ══════════════════════════════════════════
    DESKTOP ADJUSTMENTS
 ══════════════════════════════════════════ */
@@ -550,7 +591,7 @@ body {
   .pick-nome  { font-size: .88rem; }
   .pick-item  { padding: .85rem 1rem .85rem 1.2rem; }
 }
-
+ 
 /* ══════════════════════════════════════════
    TOAST
 ══════════════════════════════════════════ */
@@ -574,7 +615,7 @@ body {
 </style>
 </head>
 <body>
-
+ 
 <!-- ══ LOADING ══ -->
 <div id="sLoad" class="screen active">
   <div class="load-box">
@@ -582,7 +623,7 @@ body {
     <div class="load-label" id="loadLabel">Carregando sessão…</div>
   </div>
 </div>
-
+ 
 <!-- ══ EMPLOYEE ══ -->
 <div id="sEmployee" class="screen">
   <header class="app-header">
@@ -593,6 +634,7 @@ body {
     </div>
     <div class="header-right">
       <span class="progress-pill" id="empPill">0/0</span>
+      <button class="theme-btn" id="themeBtn" title="Alternar tema">🌙</button>
       <span class="live-dot" id="empDot"></span>
     </div>
   </header>
@@ -601,7 +643,7 @@ body {
   </div>
   <div class="all-done" id="allDone">🎉 Tudo separado!</div>
 </div>
-
+ 
 <!-- ══ ADMIN ══ -->
 <div id="sAdmin" class="screen">
   <header class="app-header">
@@ -612,6 +654,7 @@ body {
     </div>
     <div class="header-right">
       <button class="icon-btn" id="switchToEmpBtn">👤 Funcionário</button>
+      <button class="theme-btn" id="themeBtnAdmin" title="Alternar tema">🌙</button>
       <span class="live-dot" id="adminDot"></span>
     </div>
   </header>
@@ -619,10 +662,36 @@ body {
     <div class="admin-inner" id="adminBody"></div>
   </div>
 </div>
-
+ 
 <div class="toast-el" id="toast"></div>
-
+ 
 <script>
+// ══════════════════════════════════════════
+//  THEME
+// ══════════════════════════════════════════
+const THEME_STORE = 'picking_theme_pref';
+ 
+function applyTheme(dark) {
+  document.body.classList.toggle('dark', dark);
+  const icon = dark ? '☀️' : '🌙';
+  const metaColor = dark ? '#0f1117' : '#f5f7fa';
+  ['themeBtn', 'themeBtnAdmin'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.textContent = icon;
+  });
+  const meta = document.getElementById('themeColorMeta');
+  if (meta) meta.setAttribute('content', metaColor);
+}
+ 
+function toggleTheme() {
+  const isDark = !document.body.classList.contains('dark');
+  localStorage.setItem(THEME_STORE, isDark ? 'dark' : 'light');
+  applyTheme(isDark);
+}
+ 
+// Apply saved preference (default = light)
+applyTheme(localStorage.getItem(THEME_STORE) === 'dark');
+ 
 // ══════════════════════════════════════════
 //  BOOTSTRAP
 // ══════════════════════════════════════════
@@ -631,28 +700,28 @@ const SESSION     = PARAMS.get('s')   || '';
 const DB_RAW      = PARAMS.get('db')  || '';
 const DB_URL      = DB_RAW ? decodeURIComponent(DB_RAW).replace(/\/$/, '') : '';
 const ADMIN_STORE = 'picking_admin_pref';
-
+ 
 // Admin if ?admin in URL, or previously toggled, or triple-tapping logo
 let isAdmin = PARAMS.has('admin') || localStorage.getItem(ADMIN_STORE) === '1';
-
+ 
 // ── App state ──
 let session = null;   // { meta, sitesData }
 let state   = {};     // { "SH_0_0": true, ... }
 let sseConn = null;
 let pollId  = null;
 let syncPending = false;
-
+ 
 // ══════════════════════════════════════════
 //  UTILS
 // ══════════════════════════════════════════
 const $  = id => document.getElementById(id);
 const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
-
+ 
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   $('s' + name).classList.add('active');
 }
-
+ 
 let toastTimer = null;
 function toast(msg, dur = 2000) {
   const t = $('toast');
@@ -661,7 +730,7 @@ function toast(msg, dur = 2000) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), dur);
 }
-
+ 
 function setDot(id, status) { // 'ok' | 'offline' | 'syncing'
   const d = $(id);
   if (!d) return;
@@ -669,7 +738,7 @@ function setDot(id, status) { // 'ok' | 'offline' | 'syncing'
   if (status === 'offline') d.classList.add('offline');
   if (status === 'syncing') d.classList.add('syncing');
 }
-
+ 
 // ══════════════════════════════════════════
 //  LOAD SESSION
 // ══════════════════════════════════════════
@@ -678,54 +747,54 @@ async function loadSession() {
     showError('Link inválido. Os parâmetros <code>s</code> (sessão) e <code>db</code> (Firebase URL) são obrigatórios.<br><br>Gere o link pelo botão <strong>🔥 Publicar Online</strong> no Processador.');
     return;
   }
-
+ 
   try {
     setLoadLabel('Conectando ao Firebase…');
     const res = await fetch(`${DB_URL}/pick_sessions/${SESSION}.json`);
     if (!res.ok) throw new Error(`Firebase retornou HTTP ${res.status}.`);
-
+ 
     const raw = await res.json();
     if (!raw || !raw.sitesData) throw new Error('Sessão não encontrada ou expirada.');
-
+ 
     session = raw;
     state   = raw.state || {};
-
+ 
     buildEmployee();
     buildAdmin();
     showScreen(isAdmin ? 'Admin' : 'Employee');
     startSync();
-
+ 
   } catch (err) {
     showError(err.message);
   }
 }
-
+ 
 function setLoadLabel(msg) { $('loadLabel').textContent = msg; }
-
+ 
 function showError(html) {
   const box = $('loadLabel').parentElement;
   box.querySelector('.load-spinner')?.remove();
   box.querySelector('.load-label').outerHTML =
     `<div class="load-error-msg">❌ ${html}</div>`;
 }
-
+ 
 // ══════════════════════════════════════════
 //  BUILD EMPLOYEE VIEW
 // ══════════════════════════════════════════
 function buildEmployee() {
   const { meta, sitesData } = session;
   $('empSub').textContent = `${meta.dateStr || ''}  ${meta.timeStr || ''}`;
-
+ 
   const body = $('empBody');
   body.innerHTML = '';
-
+ 
   sitesData.forEach((site, si) => {
     const colorMap = { SH: '#f97316', ML: '#facc15', AZ: '#60a5fa', EV: '#4ade80' };
     const color = site.hex || colorMap[site.id] || '#8899bb';
-
+ 
     const block = el('div', 'site-block');
     block.id = `sb-${si}`;
-
+ 
     // header
     const hdr = el('div', 'site-block-hdr');
     hdr.innerHTML = `
@@ -734,17 +803,17 @@ function buildEmployee() {
       <span class="site-stat" id="sstat-${si}"></span>
     `;
     block.appendChild(hdr);
-
+ 
     // orders
     site.groups.forEach((group, gi) => {
       const row = el('div', 'order-row');
       row.id = `orow-${si}-${gi}`;
-
+ 
       const shortId = group.id.length > 26 ? group.id.slice(0, 26) + '…' : group.id;
-
+ 
       // Circumference for r=15.9
       const CIRC = (2 * Math.PI * 15.9).toFixed(2);
-
+ 
       row.innerHTML = `
         <div class="order-hdr">
           <div class="ring-wrap">
@@ -766,21 +835,21 @@ function buildEmployee() {
         </div>
         <div class="order-items" id="oi-${si}-${gi}"></div>
       `;
-
+ 
       // click header → toggle expand
       row.querySelector('.order-hdr').addEventListener('click', () => {
         row.classList.toggle('open');
       });
-
+ 
       // build items
       const itemsWrap = row.querySelector(`#oi-${si}-${gi}`);
       group.itens.forEach((item, ii) => {
         const key = `${site.id}_${gi}_${ii}`;
         const div = el('div', 'pick-item' + (state[key] ? ' done' : ''));
         div.id = `pi-${key}`;
-
+ 
         const hasLoc = item.loc && item.loc !== 'S/ SKU' && item.loc.trim() !== '';
-
+ 
         div.innerHTML = `
           <div class="pick-cb">${state[key] ? '✓' : ''}</div>
           <div class="pick-text">
@@ -788,24 +857,24 @@ function buildEmployee() {
             <div class="pick-loc${hasLoc ? ' has-loc' : ''}">${hasLoc ? escHtml(item.loc) : '—'}</div>
           </div>
         `;
-
+ 
         div.addEventListener('click', e => {
           e.stopPropagation();
           toggleItem(key, si, gi, ii);
         });
-
+ 
         itemsWrap.appendChild(div);
       });
-
+ 
       block.appendChild(row);
     });
-
+ 
     body.appendChild(block);
   });
-
+ 
   refreshEmployeeState();
 }
-
+ 
 function escHtml(str) {
   return String(str)
     .replace(/&/g,'&amp;')
@@ -813,17 +882,17 @@ function escHtml(str) {
     .replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;');
 }
-
+ 
 // ── Update rings + pill + badges without full re-render ──
 function refreshEmployeeState() {
   if (!session) return;
   const CIRC = 2 * Math.PI * 15.9;
-
+ 
   let totalDone = 0, totalAll = 0;
-
+ 
   session.sitesData.forEach((site, si) => {
     let siteDone = 0, siteAll = 0;
-
+ 
     site.groups.forEach((group, gi) => {
       let gDone = 0;
       group.itens.forEach((item, ii) => {
@@ -831,31 +900,31 @@ function refreshEmployeeState() {
         siteAll++; totalAll++;
         if (state[key]) { gDone++; siteDone++; totalDone++; }
       });
-
+ 
       const total = group.itens.length;
       const pct   = total > 0 ? gDone / total : 0;
       const offset = CIRC * (1 - pct);
-
+ 
       const rfg  = $(`rfg-${si}-${gi}`);
       const rlbl = $(`rlbl-${si}-${gi}`);
       const orow = $(`orow-${si}-${gi}`);
-
+ 
       if (rfg)  rfg.style.strokeDashoffset  = offset.toFixed(2);
       if (rlbl) rlbl.textContent = `${gDone}/${total}`;
       if (orow) orow.classList.toggle('fully-done', gDone === total && total > 0);
     });
-
+ 
     const st = $(`sstat-${si}`);
     if (st) st.textContent = `${siteDone}/${siteAll}`;
   });
-
+ 
   // pill
   const pill = $('empPill');
   if (pill) {
     pill.textContent = `${totalDone}/${totalAll}`;
     pill.classList.toggle('done', totalDone > 0 && totalDone === totalAll);
   }
-
+ 
   // all-done banner
   const banner = $('allDone');
   if (banner) {
@@ -869,14 +938,14 @@ function refreshEmployeeState() {
     }
   }
 }
-
+ 
 // ══════════════════════════════════════════
 //  TOGGLE ITEM
 // ══════════════════════════════════════════
 async function toggleItem(key, si, gi, ii) {
   const newVal = !state[key];
   state[key] = newVal;
-
+ 
   // Optimistic UI
   const itemEl = $(`pi-${key}`);
   if (itemEl) {
@@ -884,9 +953,9 @@ async function toggleItem(key, si, gi, ii) {
     const cb = itemEl.querySelector('.pick-cb');
     if (cb) cb.textContent = newVal ? '✓' : '';
   }
-
+ 
   refreshEmployeeState();
-
+ 
   // Push to Firebase
   setDot('empDot', 'syncing');
   try {
@@ -903,7 +972,7 @@ async function toggleItem(key, si, gi, ii) {
     toast('⚠ Sem conexão — alteração salva localmente', 3000);
   }
 }
-
+ 
 // ══════════════════════════════════════════
 //  BUILD ADMIN VIEW
 // ══════════════════════════════════════════
@@ -912,16 +981,16 @@ function buildAdmin() {
   $('adminSub').textContent = `Sessão ${meta.sessionId || ''} · ${meta.dateStr || ''}`;
   refreshAdminState();
 }
-
+ 
 function refreshAdminState() {
   if (!session) return;
   const { sitesData } = session;
   const body = $('adminBody');
   body.innerHTML = '';
-
+ 
   let totalDone = 0, totalAll = 0;
   const colorMap = { SH: '#f97316', ML: '#facc15', AZ: '#60a5fa', EV: '#4ade80' };
-
+ 
   const siteStats = sitesData.map(site => {
     const color = site.hex || colorMap[site.id] || '#8899bb';
     let siteDone = 0, siteAll = 0;
@@ -935,11 +1004,11 @@ function refreshAdminState() {
     });
     return { ...site, color, siteDone, siteAll, orders };
   });
-
+ 
   // ── Big progress card ──
   const pct = totalAll > 0 ? Math.round(totalDone / totalAll * 100) : 0;
   const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
+ 
   const bigCard = el('div', 'big-progress');
   bigCard.innerHTML = `
     <div class="bp-top">
@@ -956,14 +1025,14 @@ function refreshAdminState() {
     <div class="bp-last-update">Atualizado às ${now}</div>
   `;
   body.appendChild(bigCard);
-
+ 
   // ── Per-site cards ──
   siteStats.forEach(site => {
     if (!site.siteAll) return;
     const sitePct = site.siteAll > 0 ? Math.round(site.siteDone / site.siteAll * 100) : 0;
-
+ 
     const card = el('div', 'admin-site');
-
+ 
     const hdr = el('div', 'admin-site-hdr');
     hdr.innerHTML = `
       <span class="site-dot" style="background:${site.color}"></span>
@@ -974,7 +1043,7 @@ function refreshAdminState() {
       <span class="admin-site-count">${site.siteDone}/${site.siteAll}</span>
     `;
     card.appendChild(hdr);
-
+ 
     site.orders.forEach(o => {
       const shortId = o.id.length > 30 ? o.id.slice(0, 30) + '…' : o.id;
       const isDone    = o.done === o.total && o.total > 0;
@@ -983,7 +1052,7 @@ function refreshAdminState() {
       const txt = isDone ? '✓ Feito' : isPartial ? `${o.done}/${o.total}` : 'Pendente';
       const fillPct = o.total > 0 ? Math.round(o.done / o.total * 100) : 0;
       const barColor = isDone ? 'var(--green)' : isPartial ? 'var(--yellow)' : 'var(--border2)';
-
+ 
       const row = el('div', 'admin-order');
       row.innerHTML = `
         <span class="admin-order-id">${shortId}</span>
@@ -994,11 +1063,11 @@ function refreshAdminState() {
       `;
       card.appendChild(row);
     });
-
+ 
     body.appendChild(card);
   });
 }
-
+ 
 // ══════════════════════════════════════════
 //  REAL-TIME SYNC
 // ══════════════════════════════════════════
@@ -1010,12 +1079,12 @@ function startSync() {
     startPolling();
   }
 }
-
+ 
 function connectSSE() {
   try {
     const url = `${DB_URL}/pick_sessions/${SESSION}/state.json`;
     sseConn = new EventSource(url);
-
+ 
     sseConn.addEventListener('put', e => {
       try {
         const payload = JSON.parse(e.data);
@@ -1027,7 +1096,7 @@ function connectSSE() {
         onStateUpdate();
       } catch(err) { /* ignore */ }
     });
-
+ 
     sseConn.addEventListener('patch', e => {
       try {
         const payload = JSON.parse(e.data);
@@ -1037,12 +1106,12 @@ function connectSSE() {
         }
       } catch(err) { /* ignore */ }
     });
-
+ 
     sseConn.onopen = () => {
       setDot('empDot', 'ok');
       setDot('adminDot', 'ok');
     };
-
+ 
     sseConn.onerror = () => {
       setDot('empDot', 'offline');
       setDot('adminDot', 'offline');
@@ -1057,7 +1126,7 @@ function connectSSE() {
     startPolling();
   }
 }
-
+ 
 function startPolling() {
   if (pollId) return;
   pollId = setInterval(async () => {
@@ -1075,7 +1144,7 @@ function startPolling() {
     }
   }, 4000);
 }
-
+ 
 function onStateUpdate() {
   refreshEmployeeState();
   if ($('sAdmin').classList.contains('active')) {
@@ -1084,11 +1153,11 @@ function onStateUpdate() {
   setDot('empDot', 'ok');
   setDot('adminDot', 'ok');
 }
-
+ 
 // ══════════════════════════════════════════
 //  VIEW SWITCHING
 // ══════════════════════════════════════════
-
+ 
 // Triple-tap logo → unlock admin
 let logoTaps = 0, logoTapTimer = null;
 $('logoBtn').addEventListener('click', () => {
@@ -1104,16 +1173,22 @@ $('logoBtn').addEventListener('click', () => {
     toast('Modo Admin ativado');
   }
 });
-
+ 
 $('adminLogoBtn').addEventListener('click', () => {
   // Clicking admin logo stays in admin — can be used to force-refresh
   refreshAdminState();
 });
-
+ 
 $('switchToEmpBtn').addEventListener('click', () => {
   showScreen('Employee');
 });
-
+ 
+// Theme toggle buttons
+['themeBtn', 'themeBtnAdmin'].forEach(id => {
+  const btn = $(id);
+  if (btn) btn.addEventListener('click', toggleTheme);
+});
+ 
 // ══════════════════════════════════════════
 //  START
 // ══════════════════════════════════════════

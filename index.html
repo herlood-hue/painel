@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Processador de Planilhas v13.0</title>
+<title>Processador de Planilhas v14.0</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
@@ -159,6 +159,28 @@ tr:hover .del-btn{opacity:.7}
 @media print{.pick-header .pick-actions,.sidebar,.main-actions,.filter-bar{display:none!important}.pick-overlay{position:static}.pick-item.done{opacity:1}.pick-item.done .pick-nome{text-decoration:none}}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 
+/* ── CAIXA UNIVERSAL ── */
+.universal-box{
+  background:linear-gradient(135deg,rgba(79,142,247,.09),rgba(79,142,247,.03));
+  border:2px dashed var(--accent2);border-radius:var(--radius);padding:.75rem;
+  transition:all .2s;cursor:pointer;position:relative;
+}
+.universal-box.drag-active{
+  background:rgba(79,142,247,.18);border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(79,142,247,.15);
+}
+.universal-box-icon{font-size:1.4rem;text-align:center;margin-bottom:.35rem;line-height:1}
+.universal-box-title{font-size:.82rem;font-weight:700;color:var(--accent);text-align:center;margin-bottom:.22rem}
+.universal-box-sub{font-size:.65rem;color:var(--text3);text-align:center;line-height:1.5}
+.universal-box input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.universal-log{margin-top:.5rem;display:flex;flex-direction:column;gap:.2rem;max-height:90px;overflow-y:auto}
+.universal-log-item{font-size:.62rem;font-family:var(--mono);padding:.18rem .38rem;border-radius:4px;display:flex;align-items:center;gap:.4rem;line-height:1.4}
+.universal-log-item.ok-sh{background:rgba(249,115,22,.12);color:var(--sh)}
+.universal-log-item.ok-ml{background:rgba(250,204,21,.1);color:var(--ml)}
+.universal-log-item.ok-az{background:rgba(96,165,250,.12);color:var(--az)}
+.universal-log-item.ok-ev{background:rgba(74,222,128,.12);color:var(--ev)}
+.universal-log-item.err{background:rgba(240,92,92,.1);color:var(--red)}
+
 /* ── RESTORE BANNER ── */
 .restore-banner{display:none;align-items:center;gap:.6rem;padding:.45rem 1.25rem;background:rgba(240,180,41,.09);border-bottom:1px solid rgba(240,180,41,.25);font-size:.72rem;color:var(--yellow);flex-shrink:0;flex-wrap:wrap}
 .restore-banner span{flex:1}
@@ -277,7 +299,7 @@ tr:hover .del-btn{opacity:.7}
 <aside class="sidebar">
   <div class="sidebar-header">
     <div class="logo">📦</div>
-    <div><div class="sidebar-title">Processador</div><div class="sidebar-version">v13.0</div></div>
+    <div><div class="sidebar-title">Processador</div><div class="sidebar-version">v14.0 · Auto-detect</div></div>
     <div class="header-actions">
       <button class="icon-btn" id="darkToggle" title="Tema">🌙</button>
       <button class="icon-btn" id="fbConfigBtn" title="Configurar Firebase (Separação Online)">🔥</button>
@@ -293,6 +315,18 @@ tr:hover .del-btn{opacity:.7}
       <label class="upload-btn">Carregar Base<input type="file" id="skuFileInput" accept=".csv,.xlsx,.xls"></label>
       <div class="sku-status" id="skuStatus">Nenhuma base carregada</div>
     </div>
+  </div>
+
+  <!-- ══ CAIXA UNIVERSAL ══ -->
+  <div class="sidebar-section">
+    <div class="section-label">🚀 Caixa Universal</div>
+    <div class="universal-box" id="universalBox">
+      <input type="file" id="universalFileInput" accept=".csv,.xlsx,.xls" multiple>
+      <div class="universal-box-icon">📥</div>
+      <div class="universal-box-title">Jogar todos os arquivos aqui</div>
+      <div class="universal-box-sub">Detecta automaticamente<br>Shopee · ML · Amazon · Estante</div>
+    </div>
+    <div class="universal-log" id="universalLog"></div>
   </div>
 
   <div class="sidebar-section">
@@ -413,8 +447,8 @@ tr:hover .del-btn{opacity:.7}
 
   <div class="table-area">
     <div class="empty-state" id="emptyState">
-      <div class="empty-icon">📂</div>
-      <div class="empty-text">Carregue os arquivos dos marketplaces para começar</div>
+      <div class="empty-icon">📥</div>
+      <div class="empty-text">Jogue todos os arquivos na <strong>Caixa Universal</strong> ou carregue por marketplace</div>
     </div>
     <table id="mainTable" style="display:none">
       <thead><tr>
@@ -771,14 +805,19 @@ document.addEventListener('DOMContentLoaded', () => {
     mercadolivre: rows => {
       const results={}, out=[];
       // ML: cabeçalho na linha 5 (índice 5), dados a partir da linha 6
+      // Formato real: N.º de venda | Receita por produtos (BRL) | Total (BRL) | SKU | Título do anúncio
       const hrow = rows[5] || rows[0] || [];
       const hmap = buildHeaderMap(hrow);
 
-      const iId      = findIdx(hmap, ['número de venda','numero de venda','id de venda','nde venda','número do pedido','pedido'], 0);
-      const iReceita = findIdx(hmap, ['receita por produtos','receita por produto','valor do produto','preço de venda','preco de venda'], 7);
-      const iTotal   = findIdx(hmap, ['total brl','totalbrl','total(brl)','receita total','total líquido','total liquido','valor recebido'], 17);
+      // 'nde venda' normaliza para [ndevenda] → bate com 'N.º de venda' → [ndevenda]
+      const iId      = findIdx(hmap, ['n.º de venda','nde venda','número de venda','numero de venda','id de venda','número do pedido','pedido'], 0);
+      // 'Receita por produtos (BRL)' → [receitaporprodutosbrl]
+      const iReceita = findIdx(hmap, ['receita por produtos (brl)','receita por produtos','receita por produto','valor do produto','preço de venda','preco de venda'], 7);
+      // 'Total (BRL)' → [totalbrl]
+      const iTotal   = findIdx(hmap, ['total (brl)','total brl','totalbrl','total(brl)','receita total','total líquido','total liquido','valor recebido'], 17);
       const iSku     = findIdx(hmap, ['sku','código de produto','codigo de produto','código','codigo'], 20);
-      const iTitulo  = findIdx(hmap, ['título do anúncio','titulo do anuncio','nome do produto','anúncio','anuncio','título','titulo'], 23);
+      // 'Título do anúncio' → [titulodoanuncio]
+      const iTitulo  = findIdx(hmap, ['título do anúncio','titulo do anuncio','título do anuncio','nome do produto','anúncio','anuncio','título','titulo'], 23);
 
       for (let i=6;i<rows.length;i++) {
         const col=rows[i]; if(!col||!col[iId]) continue;
@@ -802,22 +841,31 @@ document.addEventListener('DOMContentLoaded', () => {
       const hrow = rows[0] || [];
       const hmap = buildHeaderMap(hrow);
 
-      // ── DIAGNÓSTICO: loga cabeçalhos reconhecidos para facilitar debug ──
-      // console.log('[AZ] headers:', Object.keys(hmap));
-
-      // Candidatos incluem nomes exatos do UpSeller + variantes (normalizeHeader remove acentos)
-      const iId       = findIdx(hmap, ['nz de pedido da plataforma','numero do pedido da plataforma','numero do pedido','id do pedido','order id','pedido'], 0);
+      // Nomes exatos do UpSeller (Export_Order) + variantes genéricas
+      // 'Nº de Pedido da Plataforma' → [ndepedidodaplataforma]
+      const iId       = findIdx(hmap, ['nº de pedido da plataforma','nz de pedido da plataforma','numero do pedido da plataforma','numero do pedido','id do pedido','order id','pedido'], 0);
+      // 'Valor do Pedido' → [valordopedido]  col 17
       const iTotal    = findIdx(hmap, ['valor do pedido','total do pedido','valor total','total'], 17);
+      // 'Frete do Comprador' → [fretedocomprador]  col 21
       const iFrete    = findIdx(hmap, ['frete do comprador','taxa de envio','frete','shipping fee','envio'], 21);
+      // 'Lucro Estimado' → [lucroestimado]  col 23
       const iLiq      = findIdx(hmap, ['lucro estimado','liquido','valor liquido','net amount','repasse'], 23);
-      const iNome     = findIdx(hmap, ['nome do anuncio','nome do produto','titulo do anuncio','titulo','title','product name','produto','anuncio'], 29);
+      // 'Nome do Anúncio' → [nomedoanuncio]  col 29
+      const iNome     = findIdx(hmap, ['nome do anuncio','nome do anúncio','nome do produto','titulo do anuncio','titulo','title','product name','produto','anuncio'], 29);
+      // 'SKU' → [sku]  col 30
       const iSku      = findIdx(hmap, ['sku','asin','codigo do produto'], 30);
-      const iPreco    = findIdx(hmap, ['preco de produto','preco do produto','preco unitario','preco','price','valor unitario'], 33);
-      const iQtd      = findIdx(hmap, ['qtd do produto','qtd. do produto','quantidade do produto','quantidade','qtd','quantity'], 34);
-      const iDestNome1= findIdx(hmap, ['nome do destinatario','destinatario','recipient'], 51);
+      // 'Preço de Produto' → [precodeproduto]  col 33
+      const iPreco    = findIdx(hmap, ['preço de produto','preco de produto','preco do produto','preco unitario','preco','price','valor unitario'], 33);
+      // 'Qtd. do Produto' → [qtddoproduto]  col 34
+      const iQtd      = findIdx(hmap, ['qtd. do produto','qtd do produto','quantidade do produto','quantidade','qtd','quantity'], 34);
+      // 'Nome do Destinatário' → [nomedodestinatario]  col 51
+      const iDestNome1= findIdx(hmap, ['nome do destinatario','nome do destinatário','destinatario','recipient'], 51);
+      // 'Nome de Comprador' → [nomedecomprador]  col 47
       const iDestNome2= findIdx(hmap, ['nome de comprador','nome do comprador','comprador','buyer','cliente'], 47);
-      const iEnd1     = findIdx(hmap, ['endereco do destinatario','endereco','address','logradouro'], 54);
-      const iEnd2     = findIdx(hmap, ['endereco 1','linha de endereco'], 57);
+      // 'Endereço do Destinatário' → [enderecododestinatario]  col 54
+      const iEnd1     = findIdx(hmap, ['endereço do destinatario','endereco do destinatario','endereco','address','logradouro'], 54);
+      // 'Endereço 1' → [endereco1]  col 57
+      const iEnd2     = findIdx(hmap, ['endereço 1','endereco 1','linha de endereco'], 57);
       const iCidade   = findIdx(hmap, ['cidade','city'], 61);
       const iUF       = findIdx(hmap, ['estado','uf','state'], 62);
       const iCEP      = findIdx(hmap, ['cep','postal code','codigo postal'], 63);
@@ -851,17 +899,37 @@ document.addEventListener('DOMContentLoaded', () => {
       const hrow = rows[0] || [];
       const hmap = buildHeaderMap(hrow);
 
-      const iId        = findIdx(hmap, ['código do pedido','codigo do pedido','número do pedido','numero do pedido','pedido','código','codigo'], 3);
+      // Formato real do export da Estante Virtual (vendas_DDMMAAAA.xlsx)
+      // col 3  → Pedido          [pedido]
+      // col 7  → Título          [titulo]
+      // col 10 → Descrição       [descricao]  (contém "SKU: 12345678")
+      // col 25 → Forma de envio  [formadeenvio]
+      // col 28 → Valor do frete (R$) [valordofreter]
+      // col 30 → Preço do Livro (R$) [precodolivror]
+      // col 15 → Destinatário    [destinatario]
+      // col 16 → Endereço        [endereco]
+      // col 22 → UF              [uf]
+      // col 23 → Cidade          [cidade]
+      // col 24 → CEP             [cep]
+
+      const iId        = findIdx(hmap, ['pedido','código do pedido','codigo do pedido','número do pedido','numero do pedido','código','codigo'], 3);
       const iNome      = findIdx(hmap, ['título','titulo','nome do produto','produto','nome do livro'], 7);
-      const iInfo      = findIdx(hmap, ['informações adicionais','informacoes adicionais','código interno','codigo interno','outros detalhes','detalhes'], 10);
-      const iTipoFrete = findIdx(hmap, ['tipo de envio','modalidade de envio','envio','frete tipo','tipo frete'], 25);
-      const iValFrete  = findIdx(hmap, ['valor do frete','valor frete','custo do frete','frete valor'], 28);
-      const iPreco     = findIdx(hmap, ['preço do livro','preco do livro','preço de venda','preco de venda','preço','valor do produto'], 30);
-      const iDestNome  = findIdx(hmap, ['nome do comprador','comprador','destinatário','destinatario','nome destinatário'], 33);
-      const iEndFull   = findIdx(hmap, ['endereço completo','endereco completo','endereço','endereco','logradouro'], 35);
-      const iCidade    = findIdx(hmap, ['cidade'], 36);
-      const iUF        = findIdx(hmap, ['estado','uf'], 37);
-      const iCEP       = findIdx(hmap, ['cep'], 38);
+      // 'Descrição' → [descricao] — contém "SKU: XXXXXXX"
+      const iInfo      = findIdx(hmap, ['descrição','descricao','informações adicionais','informacoes adicionais','código interno','codigo interno','detalhes'], 10);
+      // 'Forma de envio' → [formadeenvio]
+      const iTipoFrete = findIdx(hmap, ['forma de envio','tipo de envio','modalidade de envio','envio','frete tipo','tipo frete'], 25);
+      // 'Valor do frete (R$)' → [valordofreter]  (o R$ vira 'r' após normalização)
+      const iValFrete  = findIdx(hmap, ['valor do frete (r$)','valor do frete','valor frete','custo do frete','frete valor'], 28);
+      // 'Preço do Livro (R$)' → [precodolivror]
+      const iPreco     = findIdx(hmap, ['preço do livro (r$)','preco do livro (r$)','preço do livro','preco do livro','preço de venda','preco de venda','preço','valor do produto'], 30);
+      // 'Destinatário' → [destinatario]  col 15 — preferir sobre 'Comprador' (col 13)
+      const iDestNome  = findIdx(hmap, ['destinatário','destinatario','comprador','nome do comprador','nome destinatário'], 15);
+      // 'Endereço' → [endereco]  col 16
+      const iEndFull   = findIdx(hmap, ['endereço','endereco','endereço completo','endereco completo','logradouro'], 16);
+      // 'UF' → [uf]  col 22  |  'Cidade' → [cidade]  col 23  |  'CEP' → [cep]  col 24
+      const iCidade    = findIdx(hmap, ['cidade'], 23);
+      const iUF        = findIdx(hmap, ['uf','estado'], 22);
+      const iCEP       = findIdx(hmap, ['cep'], 24);
 
       for (let i=1;i<rows.length;i++) {
         const col=rows[i]; if(!col||!col[iId]) continue;
@@ -1095,6 +1163,140 @@ document.addEventListener('DOMContentLoaded', () => {
     toast(`✓ ${newRows.length} pedidos adicionados`);
   }
 
+  // ═══════════════════════════════════════════════════════
+  // ── IDENTIFICAÇÃO AUTOMÁTICA DE MARKETPLACE ──
+  // ═══════════════════════════════════════════════════════
+  function identificarMarketplace(rows) {
+    if (!rows || rows.length === 0) return null;
+
+    // Assinaturas exclusivas por marketplace
+    // ATENÇÃO: strings já normalizadas (sem acentos, espaços ou pontuação)
+    // Regra do normalizeHeader: lowercase + remove acentos PT-BR + remove [\s.º#()$*\-\/]+
+
+    // Shopee: cabeçalhos na linha 0
+    const SH_STRONG  = ['taxadecomissaodashopee','hotlisting','taxadetransacao'];
+    const SH_WEAK    = ['numerodopedido','quantidadedoproduto','numeroskudereferencia','taxadeservico'];
+
+    // Mercado Livre: cabeçalhos na linha 5 (linhas 0-4 são metadados)
+    // N.º de venda         → [ndevenda]
+    // Receita por produtos (BRL) → [receitaporprodutosbrl]
+    // Total (BRL)          → [totalbrl]
+    // Título do anúncio    → [titulodoanuncio]
+    // Tarifa de venda e impostos (BRL) → [tarifadevendaeimpostosbrl]
+    const ML_ROW5    = ['ndevenda','totalbrl','titulodoanuncio','receitaporprodutosbrl','tarifadevendaeimpostosbrl'];
+    const ML_META    = ['mercado livre','mercadolivre','mercado pago','mercadopago'];
+
+    // Amazon (UpSeller): cabeçalhos na linha 0
+    // Nº de Pedido da Plataforma → [ndepedidodaplataforma]
+    // Lucro Estimado             → [lucroestimado]
+    // Nome do Destinatário       → [nomedodestinatario]
+    const AZ_STRONG  = ['ndepedidodaplataforma','lucroestimado','nomedodestinatario'];
+    const AZ_WEAK    = ['nomedoanuncio','comissaototal','valordopedido','fretedocomprador'];
+
+    // Estante Virtual: cabeçalhos na linha 0
+    // CódigoEv           → [codigoev]        ← exclusivo EV
+    // Nº Checkout        → [ncheckout]        ← exclusivo EV
+    // Estante            → [estante]          ← exclusivo EV
+    // Forma de envio     → [formadeenvio]
+    // Valor do frete (R$)→ [valordofreter]    (R$ vira 'r' na normalização)
+    const EV_STRONG  = ['codigoev','ncheckout','estante'];
+    const EV_WEAK    = ['formadeenvio','valordofreter','isbn','autor'];
+
+    const norm = h => normalizeHeader(String(h ?? ''));
+
+    // Monta conjunto de cabeçalhos da linha 0
+    const hrow0 = rows[0] || [];
+    const h0    = new Set(hrow0.filter(Boolean).map(norm));
+
+    // Monta conjunto de cabeçalhos da linha 5 (ML usa header na linha 5)
+    const hrow5 = rows[5] || [];
+    const h5    = new Set(hrow5.filter(Boolean).map(norm));
+
+    // ── SCORES ──
+    const score = { shopee: 0, mercadolivre: 0, amazon: 0, estante: 0 };
+
+    // Shopee
+    SH_STRONG.forEach(k => { if (h0.has(k)) score.shopee += 3; });
+    SH_WEAK  .forEach(k => { if (h0.has(k)) score.shopee += 1; });
+
+    // Mercado Livre — assinatura forte: header na linha 5
+    ML_ROW5.forEach(k => { if (h5.has(k)) score.mercadolivre += 3; });
+    // Bônus: texto "mercado" nas primeiras 5 linhas
+    for (let i = 0; i < Math.min(5, rows.length); i++) {
+      const line = (rows[i] || []).map(c => String(c ?? '').toLowerCase()).join(' ');
+      if (ML_META.some(m => line.includes(m))) { score.mercadolivre += 2; break; }
+    }
+
+    // Amazon
+    AZ_STRONG.forEach(k => { if (h0.has(k)) score.amazon += 3; });
+    AZ_WEAK  .forEach(k => { if (h0.has(k)) score.amazon += 1; });
+
+    // Estante Virtual
+    EV_STRONG.forEach(k => { if (h0.has(k)) score.estante += 3; });
+    EV_WEAK  .forEach(k => { if (h0.has(k)) score.estante += 1; });
+
+    // Vencedor = maior score ≥ 3 (threshold mínimo para evitar falso positivo)
+    const winner = Object.entries(score).reduce((a, b) => b[1] > a[1] ? b : a);
+    if (winner[1] < 3) return null;
+
+    // Mapeia nome interno → chave de estratégia
+    const map = { shopee:'shopee', mercadolivre:'mercadolivre', amazon:'amazon', estante:'estante' };
+    return map[winner[0]] || null;
+  }
+
+  // ── CAIXA UNIVERSAL: processa múltiplos arquivos com detecção automática ──
+  function handleAutoFiles(files) {
+    const log = document.getElementById('universalLog');
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const wb   = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+          const plat = identificarMarketplace(rows);
+
+          if (!plat) {
+            appendAutoLog(log, file.name, null, '⚠ Não reconhecido');
+            toast(`⚠ ${file.name}: marketplace não identificado`, 4000);
+            return;
+          }
+
+          // Salva workbook raw para Amazon/Estante (usado nas Declarações)
+          if (plat === 'amazon')  window._rawWorkbooks.AZ = wb;
+          if (plat === 'estante') window._rawWorkbooks.EV = wb;
+
+          const parsed = strategies[plat](rows);
+          const labels = { shopee:'Shopee', mercadolivre:'Mercado Livre', amazon:'Amazon', estante:'Estante Virtual' };
+          const codes  = { shopee:'SH',     mercadolivre:'ML',            amazon:'AZ',     estante:'EV' };
+
+          if (!parsed.length) {
+            appendAutoLog(log, file.name, codes[plat], `${labels[plat]} — 0 pedidos`);
+            toast(`⚠ Nenhum pedido em ${file.name}`, 3000);
+          } else {
+            appendAutoLog(log, file.name, codes[plat], `${labels[plat]} — ${parsed.length} pedido${parsed.length > 1 ? 's' : ''}`);
+            addRows(parsed);
+          }
+        } catch(err) {
+          appendAutoLog(log, file.name, null, `Erro: ${err.message}`);
+          toast(`⚠ Erro em ${file.name}: ${err.message}`, 4000);
+          console.error(err);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function appendAutoLog(log, filename, code, msg) {
+    const cls = code ? `ok-${code.toLowerCase()}` : 'err';
+    const icon = { SH:'🟠', ML:'🟡', AZ:'🔵', EV:'🟢' }[code] || '❌';
+    const item = document.createElement('div');
+    item.className = `universal-log-item ${cls}`;
+    item.textContent = `${icon} ${filename.length > 22 ? filename.slice(0,20)+'…' : filename} → ${msg}`;
+    log.prepend(item);
+    // Limita histórico a 12 itens
+    while (log.children.length > 12) log.removeChild(log.lastChild);
+  }
+
   window._rawWorkbooks = { AZ: null, EV: null };
 
   function handleFiles(files, platform) {
@@ -1117,6 +1319,52 @@ document.addEventListener('DOMContentLoaded', () => {
   ['shopee','mercadolivre','amazon','estante'].forEach(p=>{
     document.getElementById(`${p}FileInput`).onchange=e=>{ if(e.target.files.length>0)handleFiles(e.target.files,p); e.target.value=''; };
   });
+
+  // ── CAIXA UNIVERSAL: input + drag-and-drop ──
+  (function setupUniversal() {
+    const box   = document.getElementById('universalBox');
+    const input = document.getElementById('universalFileInput');
+
+    input.onchange = e => {
+      if (e.target.files.length > 0) handleAutoFiles(e.target.files);
+      e.target.value = '';
+    };
+
+    // Drag visual feedback
+    ['dragenter','dragover'].forEach(evt => {
+      box.addEventListener(evt, e => {
+        e.preventDefault(); e.stopPropagation();
+        box.classList.add('drag-active');
+      });
+    });
+    ['dragleave','dragend'].forEach(evt => {
+      box.addEventListener(evt, e => {
+        e.preventDefault(); e.stopPropagation();
+        box.classList.remove('drag-active');
+      });
+    });
+    box.addEventListener('drop', e => {
+      e.preventDefault(); e.stopPropagation();
+      box.classList.remove('drag-active');
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) handleAutoFiles(files);
+    });
+
+    // Também aceita drop em toda a sidebar
+    const sidebar = document.querySelector('.sidebar');
+    ['dragenter','dragover'].forEach(evt => {
+      sidebar.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); box.classList.add('drag-active'); });
+    });
+    ['dragleave','dragend'].forEach(evt => {
+      sidebar.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); box.classList.remove('drag-active'); });
+    });
+    sidebar.addEventListener('drop', e => {
+      e.preventDefault(); e.stopPropagation();
+      box.classList.remove('drag-active');
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) handleAutoFiles(files);
+    });
+  })();
 
   document.getElementById('clearBtn').onclick=()=>{
     allRows=[];
@@ -1784,6 +2032,13 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
+
+      // Grava ponteiro "latest" → separacao_online.html abre direto sem parâmetros
+      await fetch(`${cfg.dbUrl}/latest.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, publishedAt: Date.now(), dateStr, timeStr, totalItens })
+      });
 
       window._activeSession = { sessionId, dbUrl: cfg.dbUrl, pickUrl: cfg.pickUrl, sitesData, totalItens };
       document.getElementById('pickMonitorBtn').style.display = 'inline-flex';

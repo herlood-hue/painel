@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#f5f7fa" id="themeColorMeta">
+<title>📦 Separação Online</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════
+   TOKENS — LIGHT (padrão)
+══════════════════════════════════════════ */
+:root {
+  --bg:   #f5f7fa; --bg2: #ffffff; --bg3: #eef1f6; --bg4: #e2e8f2;
+  --border: #d1d9e6; --border2: #b8c4d8;
+  --text: #1a2236; --text2: #4a5f7a; --text3: #8899bb;
+  --accent: #3a72e0; --accent2: #2a5cc8;
+  --green: #1faa6e; --green2: #178a58;
+  --red: #d94040;   --yellow: #b87b00;
+  --sh: #e05800; --ml: #a07000; --az: #2a5cc8; --ev: #1a8a4a;
+  --font: 'Sora', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --r: 12px;
+  --items-bg: rgba(0,0,0,.04);
+  --pick-done-bg: rgba(31,170,110,.04);
+  --pick-active-bg: rgba(58,114,224,.06);
+}
+
+/* ══════════════════════════════════════════
+   TOKENS — DARK
+══════════════════════════════════════════ */
+body.dark {
+  --bg:   #0f1117; --bg2: #161b27; --bg3: #1e2535; --bg4: #252d3d;
+  --border: #2a3347; --border2: #344060;
+  --text: #e8edf5; --text2: #8899bb; --text3: #4f617a;
+  --accent: #4f8ef7; --accent2: #3a72e0;
+  --green: #34c78a; --green2: #28a573;
+  --red: #f05c5c;   --yellow: #f0b429;
+  --sh: #f97316; --ml: #facc15; --az: #60a5fa; --ev: #4ade80;
+  --items-bg: rgba(0,0,0,.15);
+  --pick-done-bg: rgba(52,199,138,.03);
+  --pick-active-bg: rgba(79,142,247,.06);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { height: 100%; }
+body {
+  height: 100%;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ══════════════════════════════════════════
+   SCREENS
+══════════════════════════════════════════ */
+.screen {
+  display: none;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+.screen.active { display: flex; }
+
+/* ══════════════════════════════════════════
+   LOADING
+══════════════════════════════════════════ */
+#sLoad {
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  background: var(--bg);
+}
+.load-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .85rem;
+  max-width: 300px;
+  text-align: center;
+}
+.load-spinner {
+  width: 44px; height: 44px;
+  border: 3px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.load-label { font-size: .91rem; color: var(--text2); }   /* +1 nível */
+.load-error-msg {
+  font-size: .88rem;                                        /* +1 nível */
+  color: var(--red);
+  line-height: 1.55;
+  background: rgba(240,92,92,.08);
+  border: 1px solid rgba(240,92,92,.25);
+  border-radius: var(--r);
+  padding: .85rem 1rem;
+}
+.load-error-msg code {
+  font-family: var(--mono);
+  background: rgba(240,92,92,.15);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: .84rem;                                        /* +1 nível */
+}
+
+/* ══════════════════════════════════════════
+   SHARED HEADER
+══════════════════════════════════════════ */
+.app-header {
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: .7rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  position: relative;
+  z-index: 10;
+}
+.header-logo {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.05rem; flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 2px 10px rgba(79,142,247,.25);
+  transition: transform .15s;
+}
+.header-logo:active { transform: scale(.92); }
+.header-meta { flex: 1; min-width: 0; }
+.header-title { font-size: .96rem; font-weight: 700; line-height: 1; }   /* +1 nível */
+.header-sub {
+  font-size: .68rem;                                                       /* +1 nível */
+  color: var(--text3);
+  margin-top: 2px;
+  font-family: var(--mono);
+}
+.header-right { display: flex; align-items: center; gap: .55rem; flex-shrink: 0; }
+
+.progress-pill {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  padding: .22rem .65rem;
+  font-size: .78rem;                                        /* +1 nível */
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--text2);
+  white-space: nowrap;
+}
+.progress-pill.done { border-color: var(--green2); color: var(--green); background: rgba(52,199,138,.08); }
+
+.live-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: livepulse 2.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.live-dot.offline { background: var(--red); animation: none; }
+.live-dot.syncing { background: var(--yellow); }
+@keyframes livepulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+.icon-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  border-radius: 7px;
+  padding: .3rem .6rem;
+  font-size: .78rem;                                        /* +1 nível */
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.icon-btn:hover { background: var(--bg4); color: var(--text); }
+.icon-btn:active { transform: scale(.95); }
+
+/* ══════════════════════════════════════════
+   [NOVO] PAINEL RESUMO — Dashboard fixo abaixo do header
+══════════════════════════════════════════ */
+.summary-panel {
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: .42rem .9rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  z-index: 9;
+}
+.summary-panel::-webkit-scrollbar { display: none; }
+
+.sum-chip {
+  display: flex;
+  align-items: center;
+  gap: .32rem;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: .26rem .72rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: .72rem;
+  font-family: var(--mono);
+  font-weight: 600;
+  transition: background .15s;
+}
+.sum-chip-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sum-chip-name {
+  font-weight: 700;
+  font-size: .73rem;
+  font-family: var(--font);
+  color: var(--text);
+}
+.sum-chip-nums {
+  color: var(--text3);
+  font-size: .69rem;
+}
+.sum-chip-divider {
+  color: var(--border2);
+  margin: 0 .05rem;
+}
+/* chip de total geral */
+.sum-chip.sum-total {
+  background: var(--bg4);
+  border-color: var(--border2);
+  margin-right: .15rem;
+}
+.sum-chip.sum-total .sum-chip-name { color: var(--accent); }
+
+/* separador vertical */
+.sum-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  flex-shrink: 0;
+  margin: 0 .1rem;
+}
+
+/* ══════════════════════════════════════════
+   EMPLOYEE SCREEN
+══════════════════════════════════════════ */
+#sEmployee { background: var(--bg); }
+
+.emp-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.emp-inner {
+  padding: .75rem;
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  padding-bottom: 5rem;
+}
+
+/* ── SITE BLOCK ── */
+.site-block {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.site-block-hdr {
+  padding: .6rem .9rem;
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+.site-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.site-name { font-size: .88rem; font-weight: 700; flex: 1; }   /* +1 nível */
+
+/* [MELHORIA 4] Badge com pedidos e itens */
+.site-stat {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  font-size: .68rem;                                         /* +1 nível */
+  font-family: var(--mono);
+  color: var(--text3);
+}
+.site-stat-badge {
+  background: var(--bg4);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: .12rem .48rem;
+  font-size: .64rem;
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--text2);
+  white-space: nowrap;
+}
+.site-stat-badge.s-orders { border-color: var(--accent); color: var(--accent); background: rgba(58,114,224,.07); }
+.site-stat-badge.s-items  { color: var(--text3); }
+.site-stat-sep { color: var(--border2); font-size: .6rem; }
+
+/* ── ORDER ROW ── */
+.order-row {
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.order-row:first-of-type { border-top: none; }
+
+.order-hdr {
+  padding: .65rem .9rem;
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  transition: background .1s;
+}
+.order-row:active .order-hdr { background: var(--bg4); }
+
+/* Progress Ring */
+.ring-wrap {
+  flex-shrink: 0;
+  width: 38px; height: 38px;
+  position: relative;
+}
+.ring-wrap svg { transform: rotate(-90deg); display: block; }
+.ring-bg { fill: none; stroke: var(--border2); stroke-width: 3.2; }
+.ring-fg {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  transition: stroke-dashoffset .5s cubic-bezier(.4,0,.2,1);
+}
+.ring-label {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .52rem;                                         /* +1 nível */
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--text3);
+  pointer-events: none;
+}
+.order-row.fully-done .ring-fg { stroke: var(--green); }
+.order-row.fully-done .ring-label { color: var(--green); }
+
+.order-info { flex: 1; min-width: 0; }
+.order-id-text {
+  font-size: .78rem;                                         /* +1 nível */
+  font-family: var(--mono);
+  color: var(--text2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.order-meta {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  margin-top: 2px;
+}
+.order-item-count {
+  font-size: .68rem;                                         /* +1 nível */
+  color: var(--text3);
+}
+.order-done-badge {
+  display: none;
+  font-size: .62rem;                                         /* +1 nível */
+  font-weight: 700;
+  font-family: var(--mono);
+  background: rgba(52,199,138,.15);
+  color: var(--green);
+  border: 1px solid rgba(52,199,138,.3);
+  border-radius: 4px;
+  padding: 1px 6px;
+  letter-spacing: .03em;
+}
+.order-row.fully-done .order-done-badge { display: inline-block; }
+
+.order-chevron {
+  font-size: .9rem;
+  color: var(--text3);
+  transition: transform .22s cubic-bezier(.4,0,.2,1);
+  flex-shrink: 0;
+}
+.order-row.open .order-chevron { transform: rotate(90deg); }
+
+/* ── ITEM LIST ── */
+.order-items {
+  display: none;
+  flex-direction: column;
+  background: var(--items-bg);
+}
+.order-row.open .order-items { display: flex; }
+
+.pick-item {
+  display: flex;
+  align-items: flex-start;
+  gap: .9rem;
+  padding: 1rem .9rem 1rem 1.1rem;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+  transition: background .08s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  min-height: 62px;
+}
+.pick-item:active { background: var(--pick-active-bg); }
+.pick-item.done { background: var(--pick-done-bg); }
+
+.pick-cb {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  border: 2.5px solid var(--border2);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .95rem;
+  transition: all .18s cubic-bezier(.4,0,.2,1);
+  margin-top: 1px;
+  color: #fff;
+}
+.pick-item.done .pick-cb {
+  background: var(--green);
+  border-color: var(--green);
+  box-shadow: 0 2px 8px rgba(52,199,138,.35);
+}
+
+.pick-text { flex: 1; min-width: 0; }
+
+/* [MELHORIA 2] +1 nível no nome do produto */
+.pick-nome {
+  font-size: .93rem;           /* era .85rem → +1 nível */
+  color: var(--text);
+  line-height: 1.45;
+  word-break: break-word;
+  transition: color .15s;
+}
+.pick-item.done .pick-nome {
+  text-decoration: line-through;
+  color: var(--text3);
+}
+
+/* [MELHORIA 2] +2 níveis na localização/variação */
+.pick-loc {
+  font-size: .82rem;           /* era .68rem → +2 níveis (~+0.14rem) */
+  font-family: var(--mono);
+  color: var(--text3);
+  margin-top: .3rem;
+  font-weight: 600;
+}
+.pick-loc.has-loc {
+  color: var(--accent);
+  background: rgba(58,114,224,.07);
+  border: 1px solid rgba(58,114,224,.18);
+  border-radius: 6px;
+  padding: .2rem .5rem;
+  display: inline-block;
+}
+
+/* ── ALL DONE ── */
+.all-done {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: linear-gradient(135deg, var(--green2), var(--green));
+  color: #041a0c;
+  font-weight: 700;
+  font-size: .94rem;            /* +1 nível */
+  padding: .72rem 1.65rem;
+  border-radius: 30px;
+  box-shadow: 0 6px 28px rgba(52,199,138,.45);
+  display: none;
+  z-index: 50;
+  white-space: nowrap;
+  transition: transform .4s cubic-bezier(.34,1.56,.64,1);
+}
+.all-done.show {
+  display: block;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ══════════════════════════════════════════
+   ADMIN SCREEN
+══════════════════════════════════════════ */
+#sAdmin { background: var(--bg); }
+
+.admin-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.admin-inner {
+  padding: .85rem;
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ── BIG PROGRESS ── */
+.big-progress {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.2rem 1.25rem 1rem;
+}
+.bp-top {
+  display: flex;
+  align-items: flex-end;
+  gap: .5rem;
+  margin-bottom: .9rem;
+}
+.bp-num {
+  font-size: 2.4rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--text);
+  line-height: 1;
+}
+.bp-denom {
+  font-size: .96rem;            /* +1 nível */
+  color: var(--text3);
+  font-family: var(--mono);
+  margin-bottom: .15rem;
+}
+.bp-label {
+  font-size: .78rem;            /* +1 nível */
+  color: var(--text3);
+  margin-bottom: .18rem;
+}
+.bp-pct {
+  margin-left: auto;
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--green);
+  line-height: 1;
+}
+.bp-bar-bg {
+  height: 10px;
+  background: var(--bg4);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.bp-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green2), var(--green));
+  border-radius: 5px;
+  transition: width .7s cubic-bezier(.4,0,.2,1);
+  min-width: 0;
+}
+.bp-last-update {
+  font-size: .66rem;            /* +1 nível */
+  color: var(--text3);
+  font-family: var(--mono);
+  margin-top: .55rem;
+  text-align: right;
+}
+
+/* ── SITE CARD ── */
+.admin-site {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.admin-site-hdr {
+  padding: .58rem .9rem;
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+.admin-site-name { font-size: .88rem; font-weight: 700; flex: 1; }   /* +1 nível */
+.admin-mini-bg {
+  flex: 1; max-width: 100px;
+  height: 5px;
+  background: var(--bg4);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.admin-mini-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .5s;
+}
+.admin-site-count {
+  font-size: .71rem;            /* +1 nível */
+  font-family: var(--mono);
+  color: var(--text3);
+  white-space: nowrap;
+}
+
+/* ── ORDER STATUS ROWS ── */
+.admin-order {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .48rem .9rem;
+  border-top: 1px solid var(--border);
+  font-size: .80rem;            /* +1 nível */
+}
+.admin-order-id {
+  font-family: var(--mono);
+  font-size: .72rem;            /* +1 nível */
+  color: var(--text2);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.admin-order-bar-wrap {
+  width: 70px;
+  height: 4px;
+  background: var(--bg4);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.admin-order-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width .5s;
+}
+.admin-badge {
+  font-size: .66rem;            /* +1 nível */
+  font-weight: 700;
+  font-family: var(--mono);
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.badge-done    { background: rgba(52,199,138,.15); color: var(--green); }
+.badge-partial { background: rgba(240,180,41,.12); color: var(--yellow); }
+.badge-pending { background: var(--bg4); color: var(--text3); }
+
+/* ══════════════════════════════════════════
+   THEME TOGGLE
+══════════════════════════════════════════ */
+.theme-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  border-radius: 7px;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .95rem;
+  cursor: pointer;
+  transition: all .15s;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.theme-btn:hover { background: var(--bg4); color: var(--text); }
+.theme-btn:active { transform: scale(.92); }
+
+/* ══════════════════════════════════════════
+   SCROLLBAR
+══════════════════════════════════════════ */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ══════════════════════════════════════════
+   DESKTOP ADJUSTMENTS
+══════════════════════════════════════════ */
+@media (min-width: 640px) {
+  .emp-inner  { max-width: 580px; margin: 0 auto; padding: 1rem; gap: .75rem; }
+  .pick-nome  { font-size: .96rem; }    /* +1 nível no desktop */
+  .pick-loc   { font-size: .84rem; }    /* +2 níveis no desktop */
+  .pick-item  { padding: .85rem 1rem .85rem 1.2rem; }
+}
+
+/* ══════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════ */
+.toast-el {
+  position: fixed;
+  bottom: 1.2rem; right: 1.2rem;
+  background: var(--bg4);
+  border: 1px solid var(--border2);
+  padding: .5rem .9rem;
+  border-radius: var(--r);
+  font-size: .81rem;            /* +1 nível */
+  font-weight: 600;
+  color: var(--text);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all .2s;
+  z-index: 200;
+  pointer-events: none;
+}
+.toast-el.show { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- ══ LOADING ══ -->
+<div id="sLoad" class="screen active">
+  <div class="load-box">
+    <div class="load-spinner"></div>
+    <div class="load-label" id="loadLabel">Carregando sessão…</div>
+  </div>
+</div>
+
+<!-- ══ EMPLOYEE ══ -->
+<div id="sEmployee" class="screen">
+  <header class="app-header">
+    <div class="header-logo" id="logoBtn">📋</div>
+    <div class="header-meta">
+      <div class="header-title">Lista de Separação</div>
+      <div class="header-sub" id="empSub">—</div>
+    </div>
+    <div class="header-right">
+      <span class="progress-pill" id="empPill">0/0</span>
+      <!-- [MELHORIA 1] Botão Expandir/Recolher Todos -->
+      <button class="icon-btn" id="expandAllBtn" title="Expandir ou recolher todos os pedidos">⊞ Expandir</button>
+      <button class="theme-btn" id="themeBtn" title="Alternar tema">🌙</button>
+      <span class="live-dot" id="empDot"></span>
+    </div>
+  </header>
+
+  <!-- [MELHORIA 3] Painel de Resumo fixo abaixo do header -->
+  <div class="summary-panel" id="summaryPanel"></div>
+
+  <div class="emp-scroll">
+    <div class="emp-inner" id="empBody"></div>
+  </div>
+  <div class="all-done" id="allDone">🎉 Tudo separado!</div>
+</div>
+
+<!-- ══ ADMIN ══ -->
+<div id="sAdmin" class="screen">
+  <header class="app-header">
+    <div class="header-logo" id="adminLogoBtn">📊</div>
+    <div class="header-meta">
+      <div class="header-title">Painel Admin</div>
+      <div class="header-sub" id="adminSub">—</div>
+    </div>
+    <div class="header-right">
+      <button class="icon-btn" id="switchToEmpBtn">👤 Funcionário</button>
+      <button class="theme-btn" id="themeBtnAdmin" title="Alternar tema">🌙</button>
+      <span class="live-dot" id="adminDot"></span>
+    </div>
+  </header>
+  <div class="admin-scroll">
+    <div class="admin-inner" id="adminBody"></div>
+  </div>
+</div>
+
+<div class="toast-el" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+//  THEME
+// ══════════════════════════════════════════
+const THEME_STORE = 'picking_theme_pref';
+
+function applyTheme(dark) {
+  document.body.classList.toggle('dark', dark);
+  const icon = dark ? '☀️' : '🌙';
+  const metaColor = dark ? '#0f1117' : '#f5f7fa';
+  ['themeBtn', 'themeBtnAdmin'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.textContent = icon;
+  });
+  const meta = document.getElementById('themeColorMeta');
+  if (meta) meta.setAttribute('content', metaColor);
+}
+
+function toggleTheme() {
+  const isDark = !document.body.classList.contains('dark');
+  localStorage.setItem(THEME_STORE, isDark ? 'dark' : 'light');
+  applyTheme(isDark);
+}
+
+applyTheme(localStorage.getItem(THEME_STORE) === 'dark');
+
+// ══════════════════════════════════════════
+//  BOOTSTRAP
+// ══════════════════════════════════════════
+const PARAMS      = new URLSearchParams(location.search);
+const SESSION     = PARAMS.get('s')   || '';
+const DB_RAW      = PARAMS.get('db')  || '';
+const DB_URL      = DB_RAW ? decodeURIComponent(DB_RAW).replace(/\/$/, '') : '';
+const ADMIN_STORE = 'picking_admin_pref';
+
+let isAdmin = PARAMS.has('admin') || localStorage.getItem(ADMIN_STORE) === '1';
+
+// ── App state ──
+let session     = null;
+let state       = {};
+let sseConn     = null;
+let pollId      = null;
+let allExpanded = false;   // [MELHORIA 1] estado global de expansão
+
+// ══════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════
+const $  = id => document.getElementById(id);
+const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
+
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $('s' + name).classList.add('active');
+}
+
+let toastTimer = null;
+function toast(msg, dur = 2000) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function setDot(id, status) {
+  const d = $(id);
+  if (!d) return;
+  d.classList.remove('offline', 'syncing');
+  if (status === 'offline') d.classList.add('offline');
+  if (status === 'syncing') d.classList.add('syncing');
+}
+
+// ══════════════════════════════════════════
+//  LOAD SESSION
+// ══════════════════════════════════════════
+async function loadSession() {
+  if (!SESSION || !DB_URL) {
+    showError('Link inválido. Os parâmetros <code>s</code> (sessão) e <code>db</code> (Firebase URL) são obrigatórios.<br><br>Gere o link pelo botão <strong>🔥 Publicar Online</strong> no Processador.');
+    return;
+  }
+
+  try {
+    setLoadLabel('Conectando ao Firebase…');
+    const res = await fetch(`${DB_URL}/pick_sessions/${SESSION}.json`);
+    if (!res.ok) throw new Error(`Firebase retornou HTTP ${res.status}.`);
+
+    const raw = await res.json();
+    if (!raw || !raw.sitesData) throw new Error('Sessão não encontrada ou expirada.');
+
+    session = raw;
+    state   = raw.state || {};
+
+    buildEmployee();
+    buildAdmin();
+    showScreen(isAdmin ? 'Admin' : 'Employee');
+    startSync();
+
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+function setLoadLabel(msg) { $('loadLabel').textContent = msg; }
+
+function showError(html) {
+  const box = $('loadLabel').parentElement;
+  box.querySelector('.load-spinner')?.remove();
+  box.querySelector('.load-label').outerHTML =
+    `<div class="load-error-msg">❌ ${html}</div>`;
+}
+
+// ══════════════════════════════════════════
+//  [MELHORIA 3] PAINEL DE RESUMO
+// ══════════════════════════════════════════
+function buildSummaryPanel() {
+  if (!session) return;
+  const { sitesData } = session;
+  const panel = $('summaryPanel');
+  panel.innerHTML = '';
+
+  const colorMap = { SH: '#f97316', ML: '#facc15', AZ: '#60a5fa', EV: '#4ade80' };
+
+  let grandOrders = 0, grandItems = 0;
+
+  // chips por site
+  sitesData.forEach(site => {
+    const color = site.hex || colorMap[site.id] || '#8899bb';
+    const orders = site.groups.length;
+    const items  = site.groups.reduce((acc, g) => acc + g.itens.length, 0);
+    grandOrders += orders;
+    grandItems  += items;
+
+    const chip = el('div', 'sum-chip');
+    chip.innerHTML = `
+      <span class="sum-chip-dot" style="background:${color}"></span>
+      <span class="sum-chip-name" style="color:${color}">${site.label}</span>
+      <span class="sum-chip-nums">
+        ${orders} ped<span class="sum-chip-divider"> · </span>${items} itens
+      </span>
+    `;
+    panel.appendChild(chip);
+
+    // separador entre chips (exceto o último)
+    if (sitesData.indexOf(site) < sitesData.length - 1) {
+      panel.appendChild(el('div', 'sum-sep'));
+    }
+  });
+
+  // chip de total geral (prefixado)
+  const totalChip = el('div', 'sum-chip sum-total');
+  totalChip.innerHTML = `
+    <span class="sum-chip-name">Total</span>
+    <span class="sum-chip-nums">
+      ${grandOrders} ped<span class="sum-chip-divider"> · </span>${grandItems} itens
+    </span>
+  `;
+  // inserir no início
+  panel.insertBefore(totalChip, panel.firstChild);
+
+  // separador após total
+  const sep0 = el('div', 'sum-sep');
+  totalChip.after(sep0);
+}
+
+// ══════════════════════════════════════════
+//  BUILD EMPLOYEE VIEW
+// ══════════════════════════════════════════
+function buildEmployee() {
+  const { meta, sitesData } = session;
+  $('empSub').textContent = `${meta.dateStr || ''}  ${meta.timeStr || ''}`;
+
+  const body = $('empBody');
+  body.innerHTML = '';
+
+  sitesData.forEach((site, si) => {
+    const colorMap = { SH: '#f97316', ML: '#facc15', AZ: '#60a5fa', EV: '#4ade80' };
+    const color = site.hex || colorMap[site.id] || '#8899bb';
+
+    const block = el('div', 'site-block');
+    block.id = `sb-${si}`;
+
+    // [MELHORIA 4] header com badge de pedidos e itens
+    const totalOrders = site.groups.length;
+    const totalItems  = site.groups.reduce((acc, g) => acc + g.itens.length, 0);
+
+    const hdr = el('div', 'site-block-hdr');
+    hdr.innerHTML = `
+      <span class="site-dot" style="background:${color}"></span>
+      <span class="site-name" style="color:${color}">${site.label}</span>
+      <span class="site-stat" id="sstat-${si}">
+        <span class="site-stat-badge s-orders">${totalOrders} pedido${totalOrders !== 1 ? 's' : ''}</span>
+        <span class="site-stat-sep">|</span>
+        <span class="site-stat-badge s-items" id="sitems-${si}">${totalItems} itens</span>
+      </span>
+    `;
+    block.appendChild(hdr);
+
+    // orders
+    site.groups.forEach((group, gi) => {
+      const row = el('div', 'order-row');
+      row.id = `orow-${si}-${gi}`;
+
+      const shortId = group.id.length > 26 ? group.id.slice(0, 26) + '…' : group.id;
+      const CIRC = (2 * Math.PI * 15.9).toFixed(2);
+
+      row.innerHTML = `
+        <div class="order-hdr">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 36 36" width="38" height="38">
+              <circle class="ring-bg" cx="18" cy="18" r="15.9"/>
+              <circle class="ring-fg" id="rfg-${si}-${gi}" cx="18" cy="18" r="15.9"
+                stroke-dasharray="${CIRC}" stroke-dashoffset="${CIRC}"/>
+            </svg>
+            <div class="ring-label" id="rlbl-${si}-${gi}">0/${group.itens.length}</div>
+          </div>
+          <div class="order-info">
+            <div class="order-id-text">${shortId}</div>
+            <div class="order-meta">
+              <span class="order-item-count">${group.itens.length} item${group.itens.length !== 1 ? 's' : ''}</span>
+              <span class="order-done-badge">✓ Feito</span>
+            </div>
+          </div>
+          <span class="order-chevron">›</span>
+        </div>
+        <div class="order-items" id="oi-${si}-${gi}"></div>
+      `;
+
+      row.querySelector('.order-hdr').addEventListener('click', () => {
+        row.classList.toggle('open');
+        // sincroniza estado do botão expandir
+        syncExpandBtnLabel();
+      });
+
+      // build items
+      const itemsWrap = row.querySelector(`#oi-${si}-${gi}`);
+      group.itens.forEach((item, ii) => {
+        const key = `${site.id}_${gi}_${ii}`;
+        const div = el('div', 'pick-item' + (state[key] ? ' done' : ''));
+        div.id = `pi-${key}`;
+
+        const hasLoc = item.loc && item.loc !== 'S/ SKU' && item.loc.trim() !== '';
+
+        div.innerHTML = `
+          <div class="pick-cb">${state[key] ? '✓' : ''}</div>
+          <div class="pick-text">
+            <div class="pick-nome">${escHtml(item.nome)}</div>
+            <div class="pick-loc${hasLoc ? ' has-loc' : ''}">${hasLoc ? escHtml(item.loc) : '—'}</div>
+          </div>
+        `;
+
+        div.addEventListener('click', e => {
+          e.stopPropagation();
+          toggleItem(key, si, gi, ii);
+        });
+
+        itemsWrap.appendChild(div);
+      });
+
+      block.appendChild(row);
+    });
+
+    body.appendChild(block);
+  });
+
+  // [MELHORIA 3] Construir painel de resumo
+  buildSummaryPanel();
+
+  refreshEmployeeState();
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ══════════════════════════════════════════
+//  [MELHORIA 1] EXPANDIR / RECOLHER TODOS
+// ══════════════════════════════════════════
+function syncExpandBtnLabel() {
+  const btn = $('expandAllBtn');
+  if (!btn) return;
+  const rows = document.querySelectorAll('#empBody .order-row');
+  const openCount = document.querySelectorAll('#empBody .order-row.open').length;
+  // se todos abertos → mostra "Recolher"; caso contrário "Expandir"
+  if (openCount > 0 && openCount === rows.length) {
+    btn.textContent = '⊟ Recolher';
+    allExpanded = true;
+  } else {
+    btn.textContent = '⊞ Expandir';
+    allExpanded = false;
+  }
+}
+
+$('expandAllBtn').addEventListener('click', () => {
+  allExpanded = !allExpanded;
+  document.querySelectorAll('#empBody .order-row').forEach(row => {
+    row.classList.toggle('open', allExpanded);
+  });
+  $('expandAllBtn').textContent = allExpanded ? '⊟ Recolher' : '⊞ Expandir';
+});
+
+// ── Update rings + pill + badges sem re-render total ──
+function refreshEmployeeState() {
+  if (!session) return;
+  const CIRC = 2 * Math.PI * 15.9;
+
+  let totalDone = 0, totalAll = 0;
+
+  session.sitesData.forEach((site, si) => {
+    let siteDone = 0, siteAll = 0;
+
+    site.groups.forEach((group, gi) => {
+      let gDone = 0;
+      group.itens.forEach((item, ii) => {
+        const key = `${site.id}_${gi}_${ii}`;
+        siteAll++; totalAll++;
+        if (state[key]) { gDone++; siteDone++; totalDone++; }
+      });
+
+      const total = group.itens.length;
+      const pct   = total > 0 ? gDone / total : 0;
+      const offset = CIRC * (1 - pct);
+
+      const rfg  = $(`rfg-${si}-${gi}`);
+      const rlbl = $(`rlbl-${si}-${gi}`);
+      const orow = $(`orow-${si}-${gi}`);
+
+      if (rfg)  rfg.style.strokeDashoffset  = offset.toFixed(2);
+      if (rlbl) rlbl.textContent = `${gDone}/${total}`;
+      if (orow) orow.classList.toggle('fully-done', gDone === total && total > 0);
+    });
+
+    // [MELHORIA 4] Atualizar badge de itens concluídos no cabeçalho do site
+    const siteItemsBadge = $(`sitems-${si}`);
+    if (siteItemsBadge) {
+      const totalSiteItems = site.groups.reduce((acc, g) => acc + g.itens.length, 0);
+      siteItemsBadge.textContent = `${siteDone}/${totalSiteItems} itens`;
+      siteItemsBadge.style.color = siteDone === totalSiteItems && totalSiteItems > 0
+        ? 'var(--green)' : '';
+    }
+  });
+
+  // pill
+  const pill = $('empPill');
+  if (pill) {
+    pill.textContent = `${totalDone}/${totalAll}`;
+    pill.classList.toggle('done', totalDone > 0 && totalDone === totalAll);
+  }
+
+  // all-done banner
+  const banner = $('allDone');
+  if (banner) {
+    const shouldShow = totalDone > 0 && totalDone === totalAll;
+    if (shouldShow && !banner.classList.contains('show')) {
+      banner.style.display = 'block';
+      requestAnimationFrame(() => banner.classList.add('show'));
+    } else if (!shouldShow) {
+      banner.classList.remove('show');
+      setTimeout(() => { if (!banner.classList.contains('show')) banner.style.display = 'none'; }, 400);
+    }
+  }
+}
+
+// ══════════════════════════════════════════
+//  TOGGLE ITEM
+// ══════════════════════════════════════════
+async function toggleItem(key, si, gi, ii) {
+  const newVal = !state[key];
+  state[key] = newVal;
+
+  const itemEl = $(`pi-${key}`);
+  if (itemEl) {
+    itemEl.classList.toggle('done', newVal);
+    const cb = itemEl.querySelector('.pick-cb');
+    if (cb) cb.textContent = newVal ? '✓' : '';
+  }
+
+  refreshEmployeeState();
+
+  setDot('empDot', 'syncing');
+  try {
+    const res = await fetch(`${DB_URL}/pick_sessions/${SESSION}/state.json`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: newVal })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setDot('empDot', 'ok');
+  } catch (err) {
+    console.warn('Sync error:', err);
+    setDot('empDot', 'offline');
+    toast('⚠ Sem conexão — alteração salva localmente', 3000);
+  }
+}
+
+// ══════════════════════════════════════════
+//  BUILD ADMIN VIEW
+// ══════════════════════════════════════════
+function buildAdmin() {
+  const { meta } = session;
+  $('adminSub').textContent = `Sessão ${meta.sessionId || ''} · ${meta.dateStr || ''}`;
+  refreshAdminState();
+}
+
+function refreshAdminState() {
+  if (!session) return;
+  const { sitesData } = session;
+  const body = $('adminBody');
+  body.innerHTML = '';
+
+  let totalDone = 0, totalAll = 0;
+  const colorMap = { SH: '#f97316', ML: '#facc15', AZ: '#60a5fa', EV: '#4ade80' };
+
+  const siteStats = sitesData.map(site => {
+    const color = site.hex || colorMap[site.id] || '#8899bb';
+    let siteDone = 0, siteAll = 0;
+    const orders = site.groups.map((group, gi) => {
+      let gDone = 0;
+      group.itens.forEach((_, ii) => {
+        siteAll++; totalAll++;
+        if (state[`${site.id}_${gi}_${ii}`]) { gDone++; siteDone++; totalDone++; }
+      });
+      return { id: group.id, done: gDone, total: group.itens.length };
+    });
+    return { ...site, color, siteDone, siteAll, orders };
+  });
+
+  const pct = totalAll > 0 ? Math.round(totalDone / totalAll * 100) : 0;
+  const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  const bigCard = el('div', 'big-progress');
+  bigCard.innerHTML = `
+    <div class="bp-top">
+      <div>
+        <div class="bp-label">itens separados</div>
+        <div style="display:flex;align-items:baseline;gap:.4rem">
+          <span class="bp-num">${totalDone}</span>
+          <span class="bp-denom">/ ${totalAll}</span>
+        </div>
+      </div>
+      <span class="bp-pct">${pct}%</span>
+    </div>
+    <div class="bp-bar-bg"><div class="bp-bar" style="width:${pct}%"></div></div>
+    <div class="bp-last-update">Atualizado às ${now}</div>
+  `;
+  body.appendChild(bigCard);
+
+  siteStats.forEach(site => {
+    if (!site.siteAll) return;
+    const sitePct = site.siteAll > 0 ? Math.round(site.siteDone / site.siteAll * 100) : 0;
+
+    const card = el('div', 'admin-site');
+
+    const hdr = el('div', 'admin-site-hdr');
+    hdr.innerHTML = `
+      <span class="site-dot" style="background:${site.color}"></span>
+      <span class="admin-site-name" style="color:${site.color}">${site.label}</span>
+      <div class="admin-mini-bg">
+        <div class="admin-mini-bar" style="width:${sitePct}%;background:${site.color}"></div>
+      </div>
+      <span class="admin-site-count">${site.siteDone}/${site.siteAll}</span>
+    `;
+    card.appendChild(hdr);
+
+    site.orders.forEach(o => {
+      const shortId = o.id.length > 30 ? o.id.slice(0, 30) + '…' : o.id;
+      const isDone    = o.done === o.total && o.total > 0;
+      const isPartial = o.done > 0 && !isDone;
+      const cls = isDone ? 'badge-done' : isPartial ? 'badge-partial' : 'badge-pending';
+      const txt = isDone ? '✓ Feito' : isPartial ? `${o.done}/${o.total}` : 'Pendente';
+      const fillPct = o.total > 0 ? Math.round(o.done / o.total * 100) : 0;
+      const barColor = isDone ? 'var(--green)' : isPartial ? 'var(--yellow)' : 'var(--border2)';
+
+      const row = el('div', 'admin-order');
+      row.innerHTML = `
+        <span class="admin-order-id">${shortId}</span>
+        <div class="admin-order-bar-wrap">
+          <div class="admin-order-bar-fill" style="width:${fillPct}%;background:${barColor}"></div>
+        </div>
+        <span class="admin-badge ${cls}">${txt}</span>
+      `;
+      card.appendChild(row);
+    });
+
+    body.appendChild(card);
+  });
+}
+
+// ══════════════════════════════════════════
+//  REAL-TIME SYNC
+// ══════════════════════════════════════════
+function startSync() {
+  if (typeof EventSource !== 'undefined') {
+    connectSSE();
+  } else {
+    startPolling();
+  }
+}
+
+function connectSSE() {
+  try {
+    const url = `${DB_URL}/pick_sessions/${SESSION}/state.json`;
+    sseConn = new EventSource(url);
+
+    sseConn.addEventListener('put', e => {
+      try {
+        const payload = JSON.parse(e.data);
+        if (payload.data && typeof payload.data === 'object') {
+          state = payload.data;
+        } else if (payload.data === null) {
+          state = {};
+        }
+        onStateUpdate();
+      } catch(err) { /* ignore */ }
+    });
+
+    sseConn.addEventListener('patch', e => {
+      try {
+        const payload = JSON.parse(e.data);
+        if (payload.data && typeof payload.data === 'object') {
+          Object.assign(state, payload.data);
+          onStateUpdate();
+        }
+      } catch(err) { /* ignore */ }
+    });
+
+    sseConn.onopen = () => {
+      setDot('empDot', 'ok');
+      setDot('adminDot', 'ok');
+    };
+
+    sseConn.onerror = () => {
+      setDot('empDot', 'offline');
+      setDot('adminDot', 'offline');
+      sseConn.close();
+      sseConn = null;
+      setTimeout(() => {
+        if (!sseConn) connectSSE();
+      }, 5000);
+    };
+  } catch(e) {
+    startPolling();
+  }
+}
+
+function startPolling() {
+  if (pollId) return;
+  pollId = setInterval(async () => {
+    try {
+      const res = await fetch(`${DB_URL}/pick_sessions/${SESSION}/state.json`);
+      if (!res.ok) throw new Error();
+      const fresh = await res.json();
+      state = fresh || {};
+      onStateUpdate();
+      setDot('empDot', 'ok');
+      setDot('adminDot', 'ok');
+    } catch(e) {
+      setDot('empDot', 'offline');
+      setDot('adminDot', 'offline');
+    }
+  }, 4000);
+}
+
+function onStateUpdate() {
+  refreshEmployeeState();
+  if ($('sAdmin').classList.contains('active')) {
+    refreshAdminState();
+  }
+  setDot('empDot', 'ok');
+  setDot('adminDot', 'ok');
+}
+
+// ══════════════════════════════════════════
+//  VIEW SWITCHING
+// ══════════════════════════════════════════
+let logoTaps = 0, logoTapTimer = null;
+$('logoBtn').addEventListener('click', () => {
+  logoTaps++;
+  clearTimeout(logoTapTimer);
+  logoTapTimer = setTimeout(() => { logoTaps = 0; }, 700);
+  if (logoTaps >= 3) {
+    logoTaps = 0;
+    isAdmin = true;
+    localStorage.setItem(ADMIN_STORE, '1');
+    refreshAdminState();
+    showScreen('Admin');
+    toast('Modo Admin ativado');
+  }
+});
+
+$('adminLogoBtn').addEventListener('click', () => {
+  refreshAdminState();
+});
+
+$('switchToEmpBtn').addEventListener('click', () => {
+  showScreen('Employee');
+});
+
+['themeBtn', 'themeBtnAdmin'].forEach(id => {
+  const btn = $(id);
+  if (btn) btn.addEventListener('click', toggleTheme);
+});
+
+// ══════════════════════════════════════════
+//  START
+// ══════════════════════════════════════════
+loadSession();
+</script>
+</body>
+</html>

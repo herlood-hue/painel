@@ -627,9 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const getSku     = raw => { const s=parseStr(raw); return skuMap.has(s)?skuMap.get(s):s; };
 
   // ── HEADER-BASED COLUMN LOOKUP ──
-  // Normaliza cabeçalho: minúsculas, sem espaços/pontuação/acentos
   function normalizeHeader(h) {
-    // Mapa explícito de acentos PT-BR — mais confiável que NFD em todos os browsers
     const am = {'á':'a','à':'a','ã':'a','â':'a','ä':'a','é':'e','è':'e','ê':'e','ë':'e',
                 'í':'i','ì':'i','î':'i','ï':'i','ó':'o','ò':'o','õ':'o','ô':'o','ö':'o',
                 'ú':'u','ù':'u','û':'u','ü':'u','ç':'c','ñ':'n'};
@@ -739,6 +737,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (r.site==='SH' && r._rawSkus) {
       const items = r._rawSkus.map(s=>`${getSku(s.raw)} (x${s.q})`);
       r.sku = buildSkuDisp(items, r._rawSkus);
+    } else if (r.site==='ML' && r._rawSkuArr) {
+      // Pacote ML com múltiplos itens
+      const resolved = r._rawSkuArr.map(s => getSku(s));
+      r.sku = r._rawSkuArr.length > 1
+        ? `COM ${r._rawSkuArr.length}\n${resolved.join('\n')}`
+        : (r._rawSkuArr[0] ? getSku(r._rawSkuArr[0]) : '');
     } else if ((r.site==='ML'||r.site==='AZ') && r._rawSku) {
       r.sku = getSku(r._rawSku);
     } else if (r.site==='EV' && r._rawSkus) {
@@ -778,8 +782,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const iSku2  = findIdx(hmap, ['variação','nome de variação','nome da variação','variation name','nome variação'], 13+off);
       const iQtd   = findIdx(hmap, ['quantidade do produto','quantidade','quantity','qtd'], 16+off);
       const iPreco = findIdx(hmap, ['preço de venda original','preco de venda original','original price','preço negociado','preco negociado','preço unitário','preco unitario'], 18+off);
-      const iTaxa1 = findIdx(hmap, ['taxa de comissão da shopee','taxa de comissão','comissão shopee','commission fee','taxa shopee'], 40+off);
-      const iTaxa2 = findIdx(hmap, ['taxa de transação','taxa de serviço','taxa de transacao','transaction fee','service fee'], 42+off);
+      const iTaxa1 = findIdx(hmap, ['taxa de comissão bruta','taxa de comissão da shopee','taxa de comissão','comissão shopee','commission fee','taxa shopee'], 40+off);
+      const iTaxa2 = findIdx(hmap, ['taxa de serviço bruta','taxa de transação','taxa de serviço','taxa de transacao','transaction fee','service fee'], 42+off);
 
       for (let i=1;i<rows.length;i++) {
         const col=rows[i]; if(!col||!col[iId]) continue;
@@ -802,69 +806,159 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       return out;
     },
+
     mercadolivre: rows => {
-      const results={}, out=[];
-      // ML: cabeçalho na linha 5 (índice 5), dados a partir da linha 6
-      // Formato real: N.º de venda | Receita por produtos (BRL) | Total (BRL) | SKU | Título do anúncio
-      const hrow = rows[5] || rows[0] || [];
+      const out = [];
+
+      // ── Auto-detectar linha do cabeçalho ──
+      // Procura a linha que contém "N.º de venda" (ou variação normalizada)
+      let headerIdx = 5; // fallback padrão
+      for (let r = 0; r < Math.min(12, rows.length); r++) {
+        const row = rows[r] || [];
+        for (let c = 0; c < row.length; c++) {
+          const cell = String(row[c] ?? '');
+          if (cell.includes('N.º de venda') ||
+              cell.includes('N.o de venda') ||
+              normalizeHeader(cell) === 'ndevenda') {
+            headerIdx = r;
+            break;
+          }
+        }
+        if (headerIdx !== 5 || r === 5) break; // sai assim que encontrar ou checar r=5
+      }
+      // Re-verifica r=5 como candidato mesmo que não tenha mudado o default
+      for (let r = 0; r <= Math.min(8, rows.length - 1); r++) {
+        const row = rows[r] || [];
+        if (row.some(c => normalizeHeader(String(c ?? '')) === 'ndevenda')) {
+          headerIdx = r;
+          break;
+        }
+      }
+
+      const hrow = rows[headerIdx] || [];
       const hmap = buildHeaderMap(hrow);
 
-      // 'nde venda' normaliza para [ndevenda] → bate com 'N.º de venda' → [ndevenda]
       const iId      = findIdx(hmap, ['n.º de venda','nde venda','número de venda','numero de venda','id de venda','número do pedido','pedido'], 0);
-      // 'Receita por produtos (BRL)' → [receitaporprodutosbrl]
+      const iEstado  = findIdx(hmap, ['estado'], 2);
       const iReceita = findIdx(hmap, ['receita por produtos (brl)','receita por produtos','receita por produto','valor do produto','preço de venda','preco de venda'], 7);
-      // 'Total (BRL)' → [totalbrl]
       const iTotal   = findIdx(hmap, ['total (brl)','total brl','totalbrl','total(brl)','receita total','total líquido','total liquido','valor recebido'], 17);
       const iSku     = findIdx(hmap, ['sku','código de produto','codigo de produto','código','codigo'], 20);
-      // 'Título do anúncio' → [titulodoanuncio]
       const iTitulo  = findIdx(hmap, ['título do anúncio','titulo do anuncio','título do anuncio','nome do produto','anúncio','anuncio','título','titulo'], 23);
 
-      for (let i=6;i<rows.length;i++) {
-        const col=rows[i]; if(!col||!col[iId]) continue;
-        const id=parseStr(col[iId]);
-        if (!results[id]) results[id]={p:0,liq:0,names:[],rawSku:parseStr(col[iSku]),hasData:false};
-        results[id].p   += parseMoney(col[iReceita]);
-        results[id].liq += parseMoney(col[iTotal]);
-        results[id].hasData = true;
-        results[id].names.push(parseStr(col[iTitulo]));
+      // Helper: linha é "filho" de pacote? → tem titulo mas receita=0
+      const isChildRow = col =>
+        parseMoney(col[iReceita]) === 0 &&
+        parseStr(col[iTitulo]).trim().length > 2;
+
+      let i = headerIdx + 1;
+      while (i < rows.length) {
+        const col = rows[i];
+        if (!col || col[iId] == null || col[iId] === '') { i++; continue; }
+
+        const id        = parseStr(col[iId]);
+        if (!id) { i++; continue; }
+
+        const estadoVal = parseStr(col[iEstado]);
+        const prod      = parseMoney(col[iReceita]);
+        const liq       = parseMoney(col[iTotal]);
+        const titulo    = parseStr(col[iTitulo]).trim();
+
+        // ── DETECÇÃO DE PAI DE PACOTE ──
+        // Método 1: Estado contém "Pacote de N produtos"
+        const pacoteMat = estadoVal.match(/pacote\s+de\s+(\d+)\s+produto/i);
+
+        // Método 2 (fallback): título vazio + receita>0 + próxima linha é filho
+        const isTituloVazio = titulo === '' || titulo === ' ' || titulo.length === 0;
+        const nextIsChild   = (i + 1) < rows.length && rows[i + 1] && isChildRow(rows[i + 1]);
+        const isImplicitPack = !pacoteMat && isTituloVazio && prod > 0 && nextIsChild;
+
+        if (pacoteMat || isImplicitPack) {
+          // ── PEDIDO COM MÚLTIPLOS ITENS (PACOTE) ──
+          let packCount;
+          if (pacoteMat) {
+            packCount = parseInt(pacoteMat[1]);
+          } else {
+            // Conta quantas linhas seguintes são filhos
+            packCount = 0;
+            while ((i + 1 + packCount) < rows.length) {
+              const next = rows[i + 1 + packCount];
+              if (next && isChildRow(next)) packCount++;
+              else break;
+            }
+          }
+
+          const names     = [];
+          const rawSkuArr = [];
+
+          for (let j = 1; j <= packCount && (i + j) < rows.length; j++) {
+            const child = rows[i + j];
+            if (child) {
+              names.push(parseStr(child[iTitulo]));
+              rawSkuArr.push(parseStr(child[iSku]));
+            }
+          }
+
+          const resolved = rawSkuArr.map(s => getSku(s));
+          const sku = rawSkuArr.length > 1
+            ? `COM ${rawSkuArr.length}\n${resolved.join('\n')}`
+            : (rawSkuArr[0] ? getSku(rawSkuArr[0]) : '');
+
+          const comm    = prod - liq;
+          const commPct = prod > 0 ? (comm / prod * 100) : 0;
+
+          out.push({
+            site: 'ML',
+            id: '#' + id,
+            prod, frete: 0, total: prod,
+            nome: names.join('\n'),
+            status: 'PAGO', cod: 'ML',
+            sku, _rawSkuArr: rawSkuArr,
+            comm, commPct, liq
+          });
+
+          i += 1 + packCount; // pula pai + filhos
+
+        } else {
+          // ── PEDIDO ÚNICO ──
+          // Ignora linhas que são filhos órfãos (receita=0 sem pai detectado antes)
+          if (isChildRow(col)) { i++; continue; }
+
+          const rawSku  = parseStr(col[iSku]);
+          const nome    = titulo;
+          const comm    = prod - liq;
+          const commPct = prod > 0 ? (comm / prod * 100) : 0;
+
+          out.push({
+            site: 'ML',
+            id: '#' + id,
+            prod, frete: 0, total: prod,
+            nome, status: 'PAGO', cod: 'ML',
+            sku: getSku(rawSku), _rawSku: rawSku,
+            comm, commPct, liq
+          });
+
+          i++;
+        }
       }
-      Object.keys(results).forEach(id=>{
-        const o=results[id];
-        const comm    = o.p - o.liq;
-        const commPct = o.p > 0 ? (comm / o.p * 100) : 0;
-        out.push({site:'ML',id,prod:o.p,frete:0,total:o.p,nome:o.names.join('\n'),status:'PAGO',cod:'ML',sku:getSku(o.rawSku),_rawSku:o.rawSku,comm,commPct,liq:o.liq});
-      });
       return out;
     },
+
     amazon: rows => {
       const out=[];
       const hrow = rows[0] || [];
       const hmap = buildHeaderMap(hrow);
 
-      // Nomes exatos do UpSeller (Export_Order) + variantes genéricas
-      // 'Nº de Pedido da Plataforma' → [ndepedidodaplataforma]
       const iId       = findIdx(hmap, ['nº de pedido da plataforma','nz de pedido da plataforma','numero do pedido da plataforma','numero do pedido','id do pedido','order id','pedido'], 0);
-      // 'Valor do Pedido' → [valordopedido]  col 17
       const iTotal    = findIdx(hmap, ['valor do pedido','total do pedido','valor total','total'], 17);
-      // 'Frete do Comprador' → [fretedocomprador]  col 21
       const iFrete    = findIdx(hmap, ['frete do comprador','taxa de envio','frete','shipping fee','envio'], 21);
-      // 'Lucro Estimado' → [lucroestimado]  col 23
       const iLiq      = findIdx(hmap, ['lucro estimado','liquido','valor liquido','net amount','repasse'], 23);
-      // 'Nome do Anúncio' → [nomedoanuncio]  col 29
       const iNome     = findIdx(hmap, ['nome do anuncio','nome do anúncio','nome do produto','titulo do anuncio','titulo','title','product name','produto','anuncio'], 29);
-      // 'SKU' → [sku]  col 30
       const iSku      = findIdx(hmap, ['sku','asin','codigo do produto'], 30);
-      // 'Preço de Produto' → [precodeproduto]  col 33
       const iPreco    = findIdx(hmap, ['preço de produto','preco de produto','preco do produto','preco unitario','preco','price','valor unitario'], 33);
-      // 'Qtd. do Produto' → [qtddoproduto]  col 34
       const iQtd      = findIdx(hmap, ['qtd. do produto','qtd do produto','quantidade do produto','quantidade','qtd','quantity'], 34);
-      // 'Nome do Destinatário' → [nomedodestinatario]  col 51
       const iDestNome1= findIdx(hmap, ['nome do destinatario','nome do destinatário','destinatario','recipient'], 51);
-      // 'Nome de Comprador' → [nomedecomprador]  col 47
       const iDestNome2= findIdx(hmap, ['nome de comprador','nome do comprador','comprador','buyer','cliente'], 47);
-      // 'Endereço do Destinatário' → [enderecododestinatario]  col 54
       const iEnd1     = findIdx(hmap, ['endereço do destinatario','endereco do destinatario','endereco','address','logradouro'], 54);
-      // 'Endereço 1' → [endereco1]  col 57
       const iEnd2     = findIdx(hmap, ['endereço 1','endereco 1','linha de endereco'], 57);
       const iCidade   = findIdx(hmap, ['cidade','city'], 61);
       const iUF       = findIdx(hmap, ['estado','uf','state'], 62);
@@ -899,34 +993,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const hrow = rows[0] || [];
       const hmap = buildHeaderMap(hrow);
 
-      // Formato real do export da Estante Virtual (vendas_DDMMAAAA.xlsx)
-      // col 3  → Pedido          [pedido]
-      // col 7  → Título          [titulo]
-      // col 10 → Descrição       [descricao]  (contém "SKU: 12345678")
-      // col 25 → Forma de envio  [formadeenvio]
-      // col 28 → Valor do frete (R$) [valordofreter]
-      // col 30 → Preço do Livro (R$) [precodolivror]
-      // col 15 → Destinatário    [destinatario]
-      // col 16 → Endereço        [endereco]
-      // col 22 → UF              [uf]
-      // col 23 → Cidade          [cidade]
-      // col 24 → CEP             [cep]
-
       const iId        = findIdx(hmap, ['pedido','código do pedido','codigo do pedido','número do pedido','numero do pedido','código','codigo'], 3);
       const iNome      = findIdx(hmap, ['título','titulo','nome do produto','produto','nome do livro'], 7);
-      // 'Descrição' → [descricao] — contém "SKU: XXXXXXX"
       const iInfo      = findIdx(hmap, ['descrição','descricao','informações adicionais','informacoes adicionais','código interno','codigo interno','detalhes'], 10);
-      // 'Forma de envio' → [formadeenvio]
       const iTipoFrete = findIdx(hmap, ['forma de envio','tipo de envio','modalidade de envio','envio','frete tipo','tipo frete'], 25);
-      // 'Valor do frete (R$)' → [valordofreter]  (o R$ vira 'r' após normalização)
       const iValFrete  = findIdx(hmap, ['valor do frete (r$)','valor do frete','valor frete','custo do frete','frete valor'], 28);
-      // 'Preço do Livro (R$)' → [precodolivror]
       const iPreco     = findIdx(hmap, ['preço do livro (r$)','preco do livro (r$)','preço do livro','preco do livro','preço de venda','preco de venda','preço','valor do produto'], 30);
-      // 'Destinatário' → [destinatario]  col 15 — preferir sobre 'Comprador' (col 13)
       const iDestNome  = findIdx(hmap, ['destinatário','destinatario','comprador','nome do comprador','nome destinatário'], 15);
-      // 'Endereço' → [endereco]  col 16
       const iEndFull   = findIdx(hmap, ['endereço','endereco','endereço completo','endereco completo','logradouro'], 16);
-      // 'UF' → [uf]  col 22  |  'Cidade' → [cidade]  col 23  |  'CEP' → [cep]  col 24
       const iCidade    = findIdx(hmap, ['cidade'], 23);
       const iUF        = findIdx(hmap, ['uf','estado'], 22);
       const iCEP       = findIdx(hmap, ['cep'], 24);
@@ -1169,77 +1243,46 @@ document.addEventListener('DOMContentLoaded', () => {
   function identificarMarketplace(rows) {
     if (!rows || rows.length === 0) return null;
 
-    // Assinaturas exclusivas por marketplace
-    // ATENÇÃO: strings já normalizadas (sem acentos, espaços ou pontuação)
-    // Regra do normalizeHeader: lowercase + remove acentos PT-BR + remove [\s.º#()$*\-\/]+
-
-    // Shopee: cabeçalhos na linha 0
     const SH_STRONG  = ['taxadecomissaodashopee','hotlisting','taxadetransacao'];
     const SH_WEAK    = ['numerodopedido','quantidadedoproduto','numeroskudereferencia','taxadeservico'];
 
-    // Mercado Livre: cabeçalhos na linha 5 (linhas 0-4 são metadados)
-    // N.º de venda         → [ndevenda]
-    // Receita por produtos (BRL) → [receitaporprodutosbrl]
-    // Total (BRL)          → [totalbrl]
-    // Título do anúncio    → [titulodoanuncio]
-    // Tarifa de venda e impostos (BRL) → [tarifadevendaeimpostosbrl]
     const ML_ROW5    = ['ndevenda','totalbrl','titulodoanuncio','receitaporprodutosbrl','tarifadevendaeimpostosbrl'];
     const ML_META    = ['mercado livre','mercadolivre','mercado pago','mercadopago'];
 
-    // Amazon (UpSeller): cabeçalhos na linha 0
-    // Nº de Pedido da Plataforma → [ndepedidodaplataforma]
-    // Lucro Estimado             → [lucroestimado]
-    // Nome do Destinatário       → [nomedodestinatario]
     const AZ_STRONG  = ['ndepedidodaplataforma','lucroestimado','nomedodestinatario'];
     const AZ_WEAK    = ['nomedoanuncio','comissaototal','valordopedido','fretedocomprador'];
 
-    // Estante Virtual: cabeçalhos na linha 0
-    // CódigoEv           → [codigoev]        ← exclusivo EV
-    // Nº Checkout        → [ncheckout]        ← exclusivo EV
-    // Estante            → [estante]          ← exclusivo EV
-    // Forma de envio     → [formadeenvio]
-    // Valor do frete (R$)→ [valordofreter]    (R$ vira 'r' na normalização)
     const EV_STRONG  = ['codigoev','ncheckout','estante'];
     const EV_WEAK    = ['formadeenvio','valordofreter','isbn','autor'];
 
     const norm = h => normalizeHeader(String(h ?? ''));
 
-    // Monta conjunto de cabeçalhos da linha 0
     const hrow0 = rows[0] || [];
     const h0    = new Set(hrow0.filter(Boolean).map(norm));
 
-    // Monta conjunto de cabeçalhos da linha 5 (ML usa header na linha 5)
     const hrow5 = rows[5] || [];
     const h5    = new Set(hrow5.filter(Boolean).map(norm));
 
-    // ── SCORES ──
     const score = { shopee: 0, mercadolivre: 0, amazon: 0, estante: 0 };
 
-    // Shopee
     SH_STRONG.forEach(k => { if (h0.has(k)) score.shopee += 3; });
     SH_WEAK  .forEach(k => { if (h0.has(k)) score.shopee += 1; });
 
-    // Mercado Livre — assinatura forte: header na linha 5
     ML_ROW5.forEach(k => { if (h5.has(k)) score.mercadolivre += 3; });
-    // Bônus: texto "mercado" nas primeiras 5 linhas
     for (let i = 0; i < Math.min(5, rows.length); i++) {
       const line = (rows[i] || []).map(c => String(c ?? '').toLowerCase()).join(' ');
       if (ML_META.some(m => line.includes(m))) { score.mercadolivre += 2; break; }
     }
 
-    // Amazon
     AZ_STRONG.forEach(k => { if (h0.has(k)) score.amazon += 3; });
     AZ_WEAK  .forEach(k => { if (h0.has(k)) score.amazon += 1; });
 
-    // Estante Virtual
     EV_STRONG.forEach(k => { if (h0.has(k)) score.estante += 3; });
     EV_WEAK  .forEach(k => { if (h0.has(k)) score.estante += 1; });
 
-    // Vencedor = maior score ≥ 3 (threshold mínimo para evitar falso positivo)
     const winner = Object.entries(score).reduce((a, b) => b[1] > a[1] ? b : a);
     if (winner[1] < 3) return null;
 
-    // Mapeia nome interno → chave de estratégia
     const map = { shopee:'shopee', mercadolivre:'mercadolivre', amazon:'amazon', estante:'estante' };
     return map[winner[0]] || null;
   }
@@ -1261,7 +1304,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
           }
 
-          // Salva workbook raw para Amazon/Estante (usado nas Declarações)
           if (plat === 'amazon')  window._rawWorkbooks.AZ = wb;
           if (plat === 'estante') window._rawWorkbooks.EV = wb;
 
@@ -1293,7 +1335,6 @@ document.addEventListener('DOMContentLoaded', () => {
     item.className = `universal-log-item ${cls}`;
     item.textContent = `${icon} ${filename.length > 22 ? filename.slice(0,20)+'…' : filename} → ${msg}`;
     log.prepend(item);
-    // Limita histórico a 12 itens
     while (log.children.length > 12) log.removeChild(log.lastChild);
   }
 
@@ -1330,7 +1371,6 @@ document.addEventListener('DOMContentLoaded', () => {
       e.target.value = '';
     };
 
-    // Drag visual feedback
     ['dragenter','dragover'].forEach(evt => {
       box.addEventListener(evt, e => {
         e.preventDefault(); e.stopPropagation();
@@ -1350,7 +1390,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (files && files.length > 0) handleAutoFiles(files);
     });
 
-    // Também aceita drop em toda a sidebar
     const sidebar = document.querySelector('.sidebar');
     ['dragenter','dragover'].forEach(evt => {
       sidebar.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); box.classList.add('drag-active'); });
@@ -1471,9 +1510,6 @@ document.addEventListener('DOMContentLoaded', () => {
       let itens;
 
       if (r._rawNames && r._rawSkus && r._rawNames.length === r._rawSkus.length) {
-        // Shopee: usa arrays paralelos originais para evitar desalinhamento de indices
-        // causado pelo agrupamento de titulos em buildNomeDisp.
-        // Agrupa pares (nome, skuRaw) identicos → exibe variacoes corretamente.
         const seen = new Map();
         const order = [];
         r._rawNames.forEach((name, i) => {
@@ -1494,7 +1530,7 @@ document.addEventListener('DOMContentLoaded', () => {
           return { nome: displayName, loc };
         });
       } else {
-        // Demais marketplaces: logica original inalterada
+        // Demais marketplaces (incluindo ML com _rawSkuArr)
         const nomes    = r.nome.split('\n');
         const skuLines = r.sku.split('\n').filter(s => !s.startsWith('COM '));
         itens = skuLines.length > 1
@@ -2033,7 +2069,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
 
-      // Grava ponteiro "latest" → separacao_online.html abre direto sem parâmetros
       await fetch(`${cfg.dbUrl}/latest.json`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

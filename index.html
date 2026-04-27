@@ -988,6 +988,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return out;
     },
+
     estante: rows => {
       const results={}, out=[];
       const hrow = rows[0] || [];
@@ -995,6 +996,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const iId        = findIdx(hmap, ['pedido','código do pedido','codigo do pedido','número do pedido','numero do pedido','código','codigo'], 3);
       const iNome      = findIdx(hmap, ['título','titulo','nome do produto','produto','nome do livro'], 7);
+      const iAutor     = findIdx(hmap, ['autor','author','nome do autor'], 8);
       const iInfo      = findIdx(hmap, ['descrição','descricao','informações adicionais','informacoes adicionais','código interno','codigo interno','detalhes'], 10);
       const iTipoFrete = findIdx(hmap, ['forma de envio','tipo de envio','modalidade de envio','envio','frete tipo','tipo frete'], 25);
       const iValFrete  = findIdx(hmap, ['valor do frete (r$)','valor do frete','valor frete','custo do frete','frete valor'], 28);
@@ -1020,7 +1022,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         }
         results[id].p+=parseMoney(col[iPreco]);
-        results[id].names.push(parseStr(col[iNome]));
+        // ── Nome do produto + Autor (Coluna I) ──
+        const titulo = parseStr(col[iNome]);
+        const autor  = parseStr(col[iAutor]);
+        const nomeComAutor = titulo && autor ? `${titulo} - (${autor})` : titulo;
+        results[id].names.push(nomeComAutor);
         const cv=String(col[iInfo]||''),m=cv.match(/SKU: (\d+)/);
         results[id].rawSkus.push(m?m[1]:'S/ SKU');
       }

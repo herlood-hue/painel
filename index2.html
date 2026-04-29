@@ -1597,22 +1597,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('pickPublishBtn');
     btn.textContent = '\u231b Publicando...'; btn.disabled = true;
     try {
+      const now = new Date();
       const sessionId = 'sess_' + Date.now();
-      const sites = ['SH','ML','AZ','EV'];
-      const data = { sessionId, createdAt: Date.now(), total: allRows.length };
-      sites.forEach(s => {
-        const rows = allRows.filter(r => r.site === s);
-        if (!rows.length) return;
-        data[s] = extractPickGroups(rows).map(g => ({
-          id: g.id,
-          itens: g.itens.map(it => ({ nome: it.nome, loc: it.loc || '', done: false }))
-        }));
+      const colorMap = {SH:'#f97316',ML:'#facc15',AZ:'#60a5fa',EV:'#4ade80'};
+      const labelMap = {SH:'Shopee',ML:'Mercado Livre',AZ:'Amazon',EV:'Estante Virtual'};
+      const sitesData = [];
+      ['SH','ML','AZ','EV'].forEach(s => {
+        const rows = allRows.filter(r => r.site === s); if (!rows.length) return;
+        sitesData.push({
+          id: s, label: labelMap[s], hex: colorMap[s],
+          groups: extractPickGroups(rows).map(g => ({
+            id: g.id,
+            itens: g.itens.map(it => ({ nome: it.nome, loc: it.loc || '' }))
+          }))
+        });
       });
+      const data = {
+        meta: { sessionId, dateStr: now.toLocaleDateString('pt-BR'), timeStr: now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) },
+        sitesData,
+        state: {}
+      };
       const url = fbCfg.dbUrl.replace(/\/?$/, '') + '/pick_sessions/' + sessionId + '.json';
       const res = await fetch(url, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       window._activeSession = sessionId;
-      const pickUrl = fbCfg.pickUrl ? fbCfg.pickUrl.replace(/\/?$/,'') + '?session=' + sessionId : null;
+      const pickUrl = fbCfg.pickUrl ? fbCfg.pickUrl.replace(/\/?$/,'') + '?s=' + sessionId + '&db=' + encodeURIComponent(fbCfg.dbUrl) : null;
       document.getElementById('pickMonitorBtn').style.display = '';
       if (pickUrl) {
         navigator.clipboard.writeText(pickUrl).catch(()=>{});
@@ -1647,21 +1656,24 @@ document.addEventListener('DOMContentLoaded', () => {
       const url = fbCfg.dbUrl.replace(/\/?$/,'') + '/pick_sessions/' + window._activeSession + '.json';
       const res = await fetch(url); if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json(); if (!data) return;
-      const sessionUrl = fbCfg.pickUrl ? fbCfg.pickUrl.replace(/\/?$/,'') + '?session=' + window._activeSession : null;
+      const sessionUrl = fbCfg.pickUrl ? fbCfg.pickUrl.replace(/\/?$/,'') + '?s=' + window._activeSession + '&db=' + encodeURIComponent(fbCfg.dbUrl) : null;
       const info = document.getElementById('monitorSessionInfo');
       info.innerHTML = '<span class="monitor-live-dot"></span> Sessão: <strong>' + window._activeSession + '</strong>' +
         (sessionUrl ? ' &nbsp; <a href="' + sessionUrl + '" target="_blank">' + sessionUrl + '</a>' : '');
       const body = document.getElementById('monitorBody');
       // Keep session info, rebuild rest
       while (body.children.length > 1) body.removeChild(body.lastChild);
-      // Progresso global
+      // Progresso global — lê sitesData + state (formato separacao_online)
+      const sitesData = data.sitesData || [];
+      const stateObj  = data.state    || {};
       let totalItems = 0, doneItems = 0;
-      const sites = ['SH','ML','AZ','EV'];
-      const labels = {SH:'Shopee',ML:'Mercado Livre',AZ:'Amazon',EV:'Estante Virtual'};
-      const colors = {SH:'var(--sh)',ML:'var(--ml)',AZ:'var(--az)',EV:'var(--ev)'};
-      sites.forEach(s => {
-        if (!data[s]) return;
-        data[s].forEach(g => { g.itens.forEach(it => { totalItems++; if(it.done) doneItems++; }); });
+      sitesData.forEach(site => {
+        site.groups.forEach((g, gi) => {
+          g.itens.forEach((it, ii) => {
+            totalItems++;
+            if (stateObj[`${site.id}_${gi}_${ii}`]) doneItems++;
+          });
+        });
       });
       const pct = totalItems > 0 ? Math.round(doneItems / totalItems * 100) : 0;
       const prog = document.createElement('div'); prog.className = 'monitor-progress';
@@ -1670,17 +1682,19 @@ document.addEventListener('DOMContentLoaded', () => {
       body.appendChild(prog);
       document.getElementById('monitorLastUpdate').textContent = 'Atualizado ' + new Date().toLocaleTimeString('pt-BR');
       // Por site
-      sites.forEach(s => {
-        if (!data[s] || !data[s].length) return;
+      sitesData.forEach(site => {
+        if (!site.groups || !site.groups.length) return;
         const block = document.createElement('div'); block.className = 'monitor-site';
         let siteDone = 0, siteTotal = 0;
-        data[s].forEach(g => g.itens.forEach(it => { siteTotal++; if(it.done) siteDone++; }));
-        block.innerHTML = '<div class="monitor-site-hdr"><span class="mkt-badge" style="background:rgba(255,255,255,.08);color:' + colors[s] + '">' + s + '</span><span class="monitor-site-title" style="color:' + colors[s] + '">' + labels[s] + '</span><span style="margin-left:auto;font-size:.65rem;font-family:var(--mono);color:var(--text3)">' + siteDone + '/' + siteTotal + '</span></div>';
-        data[s].forEach(g => {
-          g.itens.forEach(it => {
+        site.groups.forEach((g, gi) => g.itens.forEach((it, ii) => { siteTotal++; if(stateObj[`${site.id}_${gi}_${ii}`]) siteDone++; }));
+        const color = site.hex || 'var(--accent)';
+        block.innerHTML = '<div class="monitor-site-hdr"><span class="mkt-badge" style="background:rgba(255,255,255,.08);color:' + color + '">' + site.id + '</span><span class="monitor-site-title" style="color:' + color + '">' + site.label + '</span><span style="margin-left:auto;font-size:.65rem;font-family:var(--mono);color:var(--text3)">' + siteDone + '/' + siteTotal + '</span></div>';
+        site.groups.forEach((g, gi) => {
+          g.itens.forEach((it, ii) => {
+            const done = !!stateObj[`${site.id}_${gi}_${ii}`];
             const item = document.createElement('div');
-            item.className = 'monitor-item' + (it.done ? ' done' : '');
-            item.innerHTML = '<div class="monitor-check ' + (it.done ? 'done' : 'pending') + '">' + (it.done ? '\u2713' : '') + '</div>' +
+            item.className = 'monitor-item' + (done ? ' done' : '');
+            item.innerHTML = '<div class="monitor-check ' + (done ? 'done' : 'pending') + '">' + (done ? '\u2713' : '') + '</div>' +
               '<span class="monitor-item-nome">' + it.nome + '</span>' +
               (it.loc ? '<span style="font-size:.62rem;font-family:var(--mono);color:var(--accent)">' + it.loc + '</span>' : '');
             block.appendChild(item);

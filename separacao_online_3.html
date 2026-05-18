@@ -45,7 +45,10 @@ body.dark {
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { height: 100%; }
+/* [ACESSIBILIDADE] Fonte +2px: base 16px → 18px.
+   Aplicada na raiz porque todo o layout usa unidades rem;
+   isso escala toda a tipografia da página de forma uniforme. */
+html { height: 100%; font-size: 18px; }
 body {
   height: 100%;
   font-family: var(--font);
@@ -253,6 +256,29 @@ body {
   flex-shrink: 0;
   margin: 0 .1rem;
 }
+
+/* ── [NAVEGAÇÃO] chips do menu como links de rolagem interna ── */
+.sum-chip-link {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sum-chip-link:hover {
+  background: var(--bg4);
+  border-color: var(--border2);
+}
+.sum-chip-link:active { transform: scale(.95); }
+.sum-chip-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* destaque temporário no bloco do site ao chegar pela navegação */
+@keyframes siteFlash {
+  0%   { box-shadow: 0 0 0 0   rgba(58,114,224,0); }
+  18%  { box-shadow: 0 0 0 3px rgba(58,114,224,.5); }
+  100% { box-shadow: 0 0 0 0   rgba(58,114,224,0); }
+}
+.site-block-flash { animation: siteFlash 1.3s ease-out; }
 
 /* ══════════════════════════════════════════
    EMPLOYEE SCREEN
@@ -842,6 +868,58 @@ function setDot(id, status) {
 }
 
 // ══════════════════════════════════════════
+//  [FEEDBACK SONORO] Web Audio API — sons de sucesso
+//  Gerados nativamente, sem arquivos .mp3 externos.
+// ══════════════════════════════════════════
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    try { audioCtx = new AC(); } catch (e) { return null; }
+  }
+  // navegadores suspendem o contexto até um gesto do usuário
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// Toca uma nota simples com envelope curto (ataque rápido + decaimento).
+function playTone(freq, startTime, duration, type = 'sine', peak = 0.18) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const osc  = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, startTime);
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.linearRampToValueAtTime(peak, startTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.03);
+}
+
+// Bip curto de sucesso — um pedido foi 100% separado.
+function playOrderDoneSound() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  playTone(880,    t,        0.12, 'sine', 0.20);   // dó-ish
+  playTone(1318.5, t + 0.10, 0.20, 'sine', 0.20);   // mais agudo
+}
+
+// Pequena fanfarra ascendente — a página inteira foi concluída.
+function playAllDoneSound() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+    playTone(f, t + i * 0.13, 0.32, 'triangle', 0.20);
+  });
+}
+
+// ══════════════════════════════════════════
 //  LOAD SESSION
 // ══════════════════════════════════════════
 async function loadSession() {
@@ -894,14 +972,19 @@ function buildSummaryPanel() {
   let grandOrders = 0, grandItems = 0;
 
   // chips por site
-  sitesData.forEach(site => {
+  sitesData.forEach((site, idx) => {
     const color = site.hex || colorMap[site.id] || '#8899bb';
     const orders = site.groups.length;
     const items  = site.groups.reduce((acc, g) => acc + g.itens.length, 0);
     grandOrders += orders;
     grandItems  += items;
 
-    const chip = el('div', 'sum-chip');
+    // [NAVEGAÇÃO] chip vira link de rolagem interna até o bloco do site
+    const chip = el('div', 'sum-chip sum-chip-link');
+    chip.setAttribute('role', 'link');
+    chip.setAttribute('tabindex', '0');
+    chip.setAttribute('aria-label', `Ir para a seção ${site.label}`);
+    chip.title = `Ir para ${site.label}`;
     chip.innerHTML = `
       <span class="sum-chip-dot" style="background:${color}"></span>
       <span class="sum-chip-name" style="color:${color}">${site.label}</span>
@@ -909,28 +992,61 @@ function buildSummaryPanel() {
         ${orders} ped<span class="sum-chip-divider"> · </span>${items} itens
       </span>
     `;
+    chip.addEventListener('click', () => scrollToSite(`sb-${idx}`));
+    chip.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        scrollToSite(`sb-${idx}`);
+      }
+    });
     panel.appendChild(chip);
 
     // separador entre chips (exceto o último)
-    if (sitesData.indexOf(site) < sitesData.length - 1) {
+    if (idx < sitesData.length - 1) {
       panel.appendChild(el('div', 'sum-sep'));
     }
   });
 
-  // chip de total geral (prefixado)
-  const totalChip = el('div', 'sum-chip sum-total');
+  // chip de total geral (prefixado) — clica para voltar ao topo da lista
+  const totalChip = el('div', 'sum-chip sum-total sum-chip-link');
+  totalChip.setAttribute('role', 'link');
+  totalChip.setAttribute('tabindex', '0');
+  totalChip.setAttribute('aria-label', 'Voltar ao topo da lista');
+  totalChip.title = 'Voltar ao topo';
   totalChip.innerHTML = `
     <span class="sum-chip-name">Total</span>
     <span class="sum-chip-nums">
       ${grandOrders} ped<span class="sum-chip-divider"> · </span>${grandItems} itens
     </span>
   `;
+  totalChip.addEventListener('click', scrollEmpToTop);
+  totalChip.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollEmpToTop(); }
+  });
   // inserir no início
   panel.insertBefore(totalChip, panel.firstChild);
 
   // separador após total
   const sep0 = el('div', 'sum-sep');
   totalChip.after(sep0);
+}
+
+// ══════════════════════════════════════════
+//  [NAVEGAÇÃO] Rolagem suave até a seção de um marketplace
+// ══════════════════════════════════════════
+function scrollToSite(blockId) {
+  const block = document.getElementById(blockId);
+  if (!block) return;
+  block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // pisca o bloco para indicar onde o usuário chegou
+  block.classList.remove('site-block-flash');
+  void block.offsetWidth;            // força reflow p/ reiniciar a animação
+  block.classList.add('site-block-flash');
+}
+
+function scrollEmpToTop() {
+  const sc = document.querySelector('.emp-scroll');
+  if (sc) sc.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // ══════════════════════════════════════════
@@ -1138,7 +1254,34 @@ function refreshEmployeeState() {
 // ══════════════════════════════════════════
 //  TOGGLE ITEM
 // ══════════════════════════════════════════
+
+// helpers de verificação para o feedback sonoro
+function isOrderDone(si, gi) {
+  const site  = session && session.sitesData[si];
+  const group = site && site.groups[gi];
+  if (!group || group.itens.length === 0) return false;
+  return group.itens.every((_, ii) => state[`${site.id}_${gi}_${ii}`]);
+}
+
+function isPageDone() {
+  if (!session) return false;
+  let all = 0, done = 0;
+  session.sitesData.forEach((site, si) => {
+    site.groups.forEach((group, gi) => {
+      group.itens.forEach((_, ii) => {
+        all++;
+        if (state[`${site.id}_${gi}_${ii}`]) done++;
+      });
+    });
+  });
+  return all > 0 && done === all;
+}
+
 async function toggleItem(key, si, gi, ii) {
+  // estado de conclusão ANTES da marcação (p/ detectar a transição → 100%)
+  const orderWasDone = isOrderDone(si, gi);
+  const pageWasDone  = isPageDone();
+
   const newVal = !state[key];
   state[key] = newVal;
 
@@ -1150,6 +1293,15 @@ async function toggleItem(key, si, gi, ii) {
   }
 
   refreshEmployeeState();
+
+  // [FEEDBACK SONOR0] só ao MARCAR e quando algo passou a ficar 100% OK
+  if (newVal) {
+    if (isPageDone() && !pageWasDone) {
+      playAllDoneSound();        // página inteira concluída
+    } else if (isOrderDone(si, gi) && !orderWasDone) {
+      playOrderDoneSound();      // pedido concluído
+    }
+  }
 
   setDot('empDot', 'syncing');
   try {

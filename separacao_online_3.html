@@ -498,6 +498,71 @@ body {
   display: inline-block;
 }
 
+/* ── ALERTA DE QUANTIDADE > 1 ──
+   Sinaliza visualmente itens com múltiplas unidades. O foco é a operação de
+   coleta: o conferente está acostumado a pegar 1 por linha, então qualquer
+   item com qty>1 ganha (1) faixa amarela na lateral, (2) badge de atenção
+   bem destacada e (3) o multiplicador em destaque colorido no nome. */
+.pick-item.multi-qty {
+  background: rgba(240,180,41,.05);
+  border-left: 5px solid var(--yellow);
+}
+.pick-item.multi-qty:active { background: rgba(240,180,41,.12); }
+.pick-item.multi-qty.done {
+  background: var(--pick-done-bg);
+  border-left-color: var(--green);
+}
+
+.qty-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  margin-bottom: .45rem;
+  padding: .35rem .65rem .35rem .55rem;
+  background: linear-gradient(135deg, #ffd34d, #f0a020);
+  color: #3a2200;
+  border-radius: 8px;
+  font-size: .82rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: .01em;
+  box-shadow: 0 2px 6px rgba(240,160,32,.35);
+  border: 1px solid rgba(120,70,0,.25);
+  animation: qty-pulse 1.8s ease-in-out infinite;
+}
+body.dark .qty-badge {
+  background: linear-gradient(135deg, #ffc94a, #ff9a1f);
+  color: #2a1500;
+  border-color: rgba(255,200,80,.5);
+  box-shadow: 0 2px 10px rgba(255,154,31,.4);
+}
+@keyframes qty-pulse {
+  0%, 100% { box-shadow: 0 2px 6px rgba(240,160,32,.35); }
+  50%      { box-shadow: 0 2px 14px rgba(240,160,32,.65); }
+}
+.pick-item.done .qty-badge {
+  animation: none;
+  opacity: .6;
+  filter: saturate(.6);
+}
+
+.qty-multiplier {
+  font-weight: 800;
+  color: #c47200;
+  background: rgba(240,160,32,.14);
+  padding: 0 .35rem;
+  border-radius: 4px;
+  margin-right: .25rem;
+}
+body.dark .qty-multiplier {
+  color: #ffb84d;
+  background: rgba(255,184,77,.16);
+}
+.pick-item.done .qty-multiplier {
+  color: var(--text3);
+  background: transparent;
+}
+
 /* ── ALL DONE ── */
 .all-done {
   position: fixed;
@@ -1148,16 +1213,34 @@ function buildEmployee() {
       const itemsWrap = row.querySelector(`#oi-${si}-${gi}`);
       group.itens.forEach((item, ii) => {
         const key = `${site.id}_${gi}_${ii}`;
-        const div = el('div', 'pick-item' + (state[key] ? ' done' : ''));
+        const qty = itemQty(item);
+        const isMulti = qty > 1;
+        const div = el('div', 'pick-item' + (state[key] ? ' done' : '') + (isMulti ? ' multi-qty' : ''));
         div.id = `pi-${key}`;
 
         const hasLoc = item.loc && item.loc !== 'S/ SKU' && item.loc.trim() !== '';
 
+        // Para itens com qty>1, o nome bruto pode vir como  N * "Produto..."
+        // — removemos esse envelope porque o badge já comunica a quantidade,
+        // e o multiplicador inline duplicaria a informação.
+        let nomeDisp = item.nome || '';
+        const wrap = nomeDisp.match(/^\s*\d+\s*\*\s*"([\s\S]*)"\s*$/);
+        if (wrap) nomeDisp = wrap[1];
+
+        const nomeHtml = isMulti
+          ? `<span class="qty-multiplier">${qty}\u00d7</span>${escHtml(nomeDisp)}`
+          : escHtml(nomeDisp);
+
+        const qtyBadgeHtml = isMulti
+          ? `<div class="qty-badge">\u26a0\ufe0f ATEN\u00c7\u00c3O: Pegar ${qty} unidades deste item!</div>`
+          : '';
+
         div.innerHTML = `
-          <div class="pick-cb">${state[key] ? '✓' : ''}</div>
+          <div class="pick-cb">${state[key] ? '\u2713' : ''}</div>
           <div class="pick-text">
-            <div class="pick-nome">${escHtml(item.nome)}</div>
-            <div class="pick-loc${hasLoc ? ' has-loc' : ''}">${hasLoc ? escHtml(item.loc) : '—'}</div>
+            ${qtyBadgeHtml}
+            <div class="pick-nome">${nomeHtml}</div>
+            <div class="pick-loc${hasLoc ? ' has-loc' : ''}">${hasLoc ? escHtml(item.loc) : '\u2014'}</div>
           </div>
         `;
 

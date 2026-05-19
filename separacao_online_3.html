@@ -797,6 +797,32 @@ body {
 
 <script>
 // ══════════════════════════════════════════
+//  CONTAGEM DE UNIDADES FÍSICAS
+// ──────────────────────────────────────────
+//  A página de Separação tem UMA checkbox por linha de produto, mas a contagem
+//  exibida deve refletir unidades físicas — um pedido com "1×Produto A + 2×Produto B"
+//  é mostrado como 3 itens (não 2). Cada item recebe um peso (`qty`) enviado pelo
+//  publicador; quando ausente (payloads antigos), o peso é extraído do prefixo
+//  "N * ..." no nome — e cai em 1 como último recurso.
+// ══════════════════════════════════════════
+function itemQty(item) {
+  if (item && typeof item.qty === 'number' && item.qty > 0) return item.qty;
+  if (item && item.nome) {
+    const m = String(item.nome).match(/^\s*(\d+)\s*\*\s*"/);
+    if (m) return parseInt(m[1], 10) || 1;
+  }
+  return 1;
+}
+function groupTotal(group) {
+  if (group && typeof group.qtd === 'number' && group.qtd > 0) return group.qtd;
+  return (group && group.itens ? group.itens.reduce((s,it)=>s+itemQty(it),0) : 0);
+}
+function siteTotal(site) {
+  if (site && typeof site.qtdSite === 'number' && site.qtdSite > 0) return site.qtdSite;
+  return (site && site.groups ? site.groups.reduce((s,g)=>s+groupTotal(g),0) : 0);
+}
+
+// ══════════════════════════════════════════
 //  THEME
 // ══════════════════════════════════════════
 const THEME_STORE = 'picking_theme_pref';
@@ -975,7 +1001,7 @@ function buildSummaryPanel() {
   sitesData.forEach((site, idx) => {
     const color = site.hex || colorMap[site.id] || '#8899bb';
     const orders = site.groups.length;
-    const items  = site.groups.reduce((acc, g) => acc + g.itens.length, 0);
+    const items  = siteTotal(site);
     grandOrders += orders;
     grandItems  += items;
 
@@ -1068,7 +1094,7 @@ function buildEmployee() {
 
     // [MELHORIA 4] header com badge de pedidos e itens
     const totalOrders = site.groups.length;
-    const totalItems  = site.groups.reduce((acc, g) => acc + g.itens.length, 0);
+    const totalItems  = siteTotal(site);
 
     const hdr = el('div', 'site-block-hdr');
     hdr.innerHTML = `
@@ -1098,12 +1124,12 @@ function buildEmployee() {
               <circle class="ring-fg" id="rfg-${si}-${gi}" cx="18" cy="18" r="15.9"
                 stroke-dasharray="${CIRC}" stroke-dashoffset="${CIRC}"/>
             </svg>
-            <div class="ring-label" id="rlbl-${si}-${gi}">0/${group.itens.length}</div>
+            <div class="ring-label" id="rlbl-${si}-${gi}">0/${groupTotal(group)}</div>
           </div>
           <div class="order-info">
             <div class="order-id-text">${shortId}</div>
             <div class="order-meta">
-              <span class="order-item-count">${group.itens.length} item${group.itens.length !== 1 ? 's' : ''}</span>
+              <span class="order-item-count">${groupTotal(group)} item${groupTotal(group) !== 1 ? 's' : ''}</span>
               <span class="order-done-badge">✓ Feito</span>
             </div>
           </div>
@@ -1200,14 +1226,18 @@ function refreshEmployeeState() {
     let siteDone = 0, siteAll = 0;
 
     site.groups.forEach((group, gi) => {
+      // gDone/siteDone/totalDone agora SOMAM o peso (qty) de cada checkbox marcada.
+      // Marcar a linha "Tudo Valeu a Pena (x2)" avança o contador em 2, não em 1 —
+      // assim o progresso fecha em N/N coerente com a contagem exibida.
       let gDone = 0;
       group.itens.forEach((item, ii) => {
         const key = `${site.id}_${gi}_${ii}`;
-        siteAll++; totalAll++;
-        if (state[key]) { gDone++; siteDone++; totalDone++; }
+        const w = itemQty(item);
+        siteAll += w; totalAll += w;
+        if (state[key]) { gDone += w; siteDone += w; totalDone += w; }
       });
 
-      const total = group.itens.length;
+      const total = groupTotal(group);
       const pct   = total > 0 ? gDone / total : 0;
       const offset = CIRC * (1 - pct);
 
@@ -1223,7 +1253,7 @@ function refreshEmployeeState() {
     // [MELHORIA 4] Atualizar badge de itens concluídos no cabeçalho do site
     const siteItemsBadge = $(`sitems-${si}`);
     if (siteItemsBadge) {
-      const totalSiteItems = site.groups.reduce((acc, g) => acc + g.itens.length, 0);
+      const totalSiteItems = siteTotal(site);
       siteItemsBadge.textContent = `${siteDone}/${totalSiteItems} itens`;
       siteItemsBadge.style.color = siteDone === totalSiteItems && totalSiteItems > 0
         ? 'var(--green)' : '';
@@ -1342,11 +1372,12 @@ function refreshAdminState() {
     let siteDone = 0, siteAll = 0;
     const orders = site.groups.map((group, gi) => {
       let gDone = 0;
-      group.itens.forEach((_, ii) => {
-        siteAll++; totalAll++;
-        if (state[`${site.id}_${gi}_${ii}`]) { gDone++; siteDone++; totalDone++; }
+      group.itens.forEach((item, ii) => {
+        const w = itemQty(item);
+        siteAll += w; totalAll += w;
+        if (state[`${site.id}_${gi}_${ii}`]) { gDone += w; siteDone += w; totalDone += w; }
       });
-      return { id: group.id, done: gDone, total: group.itens.length };
+      return { id: group.id, done: gDone, total: groupTotal(group) };
     });
     return { ...site, color, siteDone, siteAll, orders };
   });

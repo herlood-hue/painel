@@ -222,6 +222,9 @@ tr:hover .del-btn{opacity:.7}
 .monitor-session-info{font-size:.65rem;font-family:var(--mono);color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:.35rem .55rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .monitor-session-info a{color:var(--accent);text-decoration:none;word-break:break-all}
 .monitor-session-info a:hover{text-decoration:underline}
+.copy-link-btn{font-family:var(--font);font-size:.62rem;font-weight:700;padding:.2rem .55rem;background:var(--accent);border:none;color:#fff;border-radius:5px;cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0}
+.copy-link-btn:hover{background:var(--accent2)}
+.copy-link-btn.copied{background:var(--green);color:#fff}
 .monitor-live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;animation:pulse 1.5s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 /* ── ABAS ── */
@@ -608,6 +611,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const parseMoney = v => parseFloat(String(v??'0').replace(',','.')) || 0;
   const parseStr   = v => String(v!=null?v:'').trim();
   const getSku     = raw => { const s=parseStr(raw); return skuMap.has(s)?skuMap.get(s):s; };
+  // Resolve um item de SKU bruto. Itens marcados como variação (Shopee, coluna O)
+  // NÃO passam pela base de SKUs — a variação é exibida exatamente como veio.
+  const resolveRawItem = s => (s && s.isVar) ? parseStr(s.raw) : getSku(s ? s.raw : '');
 
   // ── HEADER-BASED COLUMN LOOKUP ──
   function normalizeHeader(h) {
@@ -686,7 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function reResolveSku(r) {
     if (r.site==='SH' && r._rawSkus) {
-      const items = r._rawSkus.map(s=>`${getSku(s.raw)} (x${s.q})`);
+      const items = r._rawSkus.map(s=>`${resolveRawItem(s)} (x${s.q})`);
       r.sku = buildSkuDisp(items, r._rawSkus);
     } else if (r.site==='ML' && r._rawSkuArr) {
       const resolved = r._rawSkuArr.map(s => getSku(s));
@@ -700,7 +706,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function buildSkuDisp(resolvedItems, rawSkus) {
     if (resolvedItems.length > 1) return `COM ${resolvedItems.length}\n${resolvedItems.join('\n')}`;
-    const q = rawSkus[0].q; if (q > 1) return `QTDE ${q} — ${getSku(rawSkus[0].raw)}`; return getSku(rawSkus[0].raw);
+    const s0 = rawSkus[0]; const disp = resolveRawItem(s0);
+    if (s0.q > 1) return `QTDE ${s0.q} — ${disp}`;
+    return disp;
   }
   function buildNomeDisp(names) {
     const countMap = {}; names.forEach(n => { countMap[n] = (countMap[n] || 0) + 1; });
@@ -717,7 +725,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const iSku1  = findIdx(hmap, ['número sku','numero sku','sku de referência','sku referencia','sku reference','referência sku'], 12+off);
       const iSku2  = findIdx(hmap, ['variação','nome de variação','nome da variação','variation name','nome variação'], 13+off);
       const iQtd   = findIdx(hmap, ['quantidade do produto','quantidade','quantity','qtd'], 16+off);
-      const iPreco = findIdx(hmap, ['preço de venda original','preco de venda original','original price','preço negociado','preco negociado','preço unitário','preco unitario'], 18+off);
+      // PREÇO UNITÁRIO — deve apontar para o preço por unidade ('Preço acordado' /
+      // 'Preço original'), NUNCA para 'Subtotal do produto' (que já é preço×qtd).
+      // O cálculo abaixo faz preço×qtd; usar o subtotal aqui dobrava o valor.
+      const iPreco = findIdx(hmap, ['preço acordado','preco acordado','preço original','preco original','preço de venda original','preco de venda original','original price','preço negociado','preco negociado','preço unitário','preco unitario'], 15+off);
       const iTaxa1 = findIdx(hmap, ['taxa de comissão bruta','taxa de comissão da shopee','taxa de comissão','comissão shopee','commission fee','taxa shopee'], 40+off);
       const iTaxa2 = findIdx(hmap, ['taxa de serviço bruta','taxa de transação','taxa de serviço','taxa de transacao','transaction fee','service fee'], 42+off);
       for (let i=1;i<rows.length;i++) {
@@ -726,14 +737,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!results[id]) results[id]={p:0,rawSkus:[],names:[],taxaSheet:parseMoney(col[iTaxa1])+parseMoney(col[iTaxa2])};
         const p=parseMoney(col[iPreco]),q=parseInt(col[iQtd]||1);
         results[id].p+=p*q; results[id].names.push(parseStr(col[iNome]));
-        const raw=col[iSku1]?parseStr(col[iSku1]):parseStr(col[iSku2]||'S/ SKU');
-        results[id].rawSkus.push({raw,q});
+        // Nova regra Shopee: se a Variação (coluna O) estiver preenchida, ela tem
+        // prioridade e o SKU (coluna "Número SKU") é completamente ignorado.
+        const variacao = parseStr(col[iSku2]);
+        const skuNum   = parseStr(col[iSku1]);
+        let raw, isVar;
+        if (variacao !== '')      { raw = variacao; isVar = true;  }
+        else if (skuNum !== '')   { raw = skuNum;   isVar = false; }
+        else                      { raw = 'S/ SKU'; isVar = false; }
+        results[id].rawSkus.push({raw,q,isVar});
       }
       Object.keys(results).forEach(id=>{
-        const o=results[id]; const resolved=o.rawSkus.map(s=>`${getSku(s.raw)} (x${s.q})`);
+        const o=results[id]; const resolved=o.rawSkus.map(s=>`${resolveRawItem(s)} (x${s.q})`);
         const sku=buildSkuDisp(resolved,o.rawSkus); const useSheet=o.taxaSheet>0;
         const commPct=useSheet?(o.taxaSheet/o.p*100):20; const comm=useSheet?o.taxaSheet:o.p*commPct/100;
-        out.push({site:'SH',id,prod:o.p,frete:0,total:o.p,nome:buildNomeDisp(o.names),status:'PAGO',cod:'SH',sku,_rawSkus:o.rawSkus,_rawNames:o.names,comm,commPct,liq:o.p-comm});
+        // Nome exibido: expande cada nome pela quantidade da sua linha, contando
+        // unidades físicas — um pedido "1×Produto A + 2×Produto B" mostra 3 itens.
+        const displayNames=[];
+        o.rawSkus.forEach((s,idx)=>{ const q=s.q||1; for(let k=0;k<q;k++) displayNames.push(o.names[idx]||''); });
+        out.push({site:'SH',id,prod:o.p,frete:0,total:o.p,nome:buildNomeDisp(displayNames),status:'PAGO',cod:'SH',sku,_rawSkus:o.rawSkus,_rawNames:o.names,comm,commPct,liq:o.p-comm});
       });
       return out;
     },
@@ -798,6 +820,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const iDestNome2= findIdx(hmap, ['nome de comprador','nome do comprador','comprador','buyer','cliente'], 47);
       const iEnd1     = findIdx(hmap, ['endereço do destinatario','endereco do destinatario','endereco','address','logradouro'], 54);
       const iEnd2     = findIdx(hmap, ['endereço 1','endereco 1','linha de endereco'], 57);
+      // Bairro — mesma ordem de prioridade de detectKeysAZetiq.end2 (parser das
+      // etiquetas, que já funciona no upload normal). Fallback: coluna BG (índice 58).
+      const iBairro   = findIdx(hmap, ['endereço 2','endereco 2','complemento','bairro','neighborhood','distrito'], 58);
       const iCidade   = findIdx(hmap, ['cidade','city'], 61);
       const iUF       = findIdx(hmap, ['estado','uf','state'], 62);
       const iCEP      = findIdx(hmap, ['cep','postal code','codigo postal'], 63);
@@ -813,6 +838,7 @@ document.addEventListener('DOMContentLoaded', () => {
           comm,commPct,liq,qty:parseInt(col[iQtd]||1),
           destNome:   parseStr(col[iDestNome1]||col[iDestNome2]||''),
           destEnd:    parseStr(col[iEnd1]||col[iEnd2]||''),
+          destBairro: parseStr(col[iBairro]||''),
           destCidade: parseStr(col[iCidade]||''),
           destUF:     parseStr(col[iUF]||''),
           destCEP:    parseStr(col[iCEP]||''),
@@ -833,6 +859,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const iPreco     = findIdx(hmap, ['preço do livro (r$)','preco do livro (r$)','preço do livro','preco do livro','preço de venda','preco de venda','preço','valor do produto'], 30);
       const iDestNome  = findIdx(hmap, ['destinatário','destinatario','comprador','nome do comprador','nome destinatário'], 15);
       const iEndFull   = findIdx(hmap, ['endereço','endereco','endereço completo','endereco completo','logradouro'], 16);
+      const iBairro    = findIdx(hmap, ['bairro'], 20); // coluna U
       const iCidade    = findIdx(hmap, ['cidade'], 23);
       const iUF        = findIdx(hmap, ['uf','estado'], 22);
       const iCEP       = findIdx(hmap, ['cep'], 24);
@@ -844,6 +871,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if(tf.includes('sedex'))vf=0; else vf-=4.29;
           results[id]={p:0,f:vf,rawSkus:[],names:[],
             destNome:parseStr(col[iDestNome]||''),destEndFull:parseStr(col[iEndFull]||''),
+            destBairro:parseStr(col[iBairro]||''),
             destCidade:parseStr(col[iCidade]||''),destUF:parseStr(col[iUF]||''),destCEP:parseStr(col[iCEP]||'')};
         }
         results[id].p+=parseMoney(col[iPreco]);
@@ -863,7 +891,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const mEstado=destEnd.match(/,\s*([A-Z][a-záàãâéêíóôõúü\s]+)\s*$/); if(mEstado)destUF=mEstado[1].trim();
         }
         out.push({site:'EV',id,prod:o.p,frete:o.f,total,nome:o.names.join('\n'),status:'PAGO',cod:'EV',sku,_rawSkus:o.rawSkus,comm:null,commPct:null,liq:null,
-          destNome:o.destNome,destEnd,destEndFull:o.destEndFull,destCidade,destUF,destCEP});
+          destNome:o.destNome,destEnd,destEndFull:o.destEndFull,destBairro:o.destBairro,destCidade,destUF,destCEP});
       });
       return out;
     }
@@ -1142,16 +1170,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function extractPickGroups(rows) {
     return rows.map(r=>{
-      let itens;
-      if (r._rawNames && r._rawSkus && r._rawNames.length===r._rawSkus.length) {
-        const seen=new Map(),order=[];
-        r._rawNames.forEach((name,i)=>{ const skuRaw=r._rawSkus[i].raw; const key=name+'\x00'+skuRaw; if(seen.has(key)){seen.get(key).count++;}else{const entry={name,skuRaw,count:1};seen.set(key,entry);order.push(entry);} });
-        itens=order.map(g=>{ const displayName=g.count>1?g.count+' * "'+g.name+'"':g.name; const resolvedLoc=getSku(g.skuRaw); const loc=(resolvedLoc==='S/ SKU'||resolvedLoc==='')?'':resolvedLoc; return{nome:displayName,loc}; });
+      let itens, qtdTotal;
+      if (r.site==='SH' && r._rawNames && r._rawSkus && r._rawNames.length===r._rawSkus.length) {
+        // Shopee: itera UMA VEZ POR LINHA do pedido e SOMA a quantidade de cada
+        // item. Antes o código tratava cada linha como 1 unidade — um item com
+        // "(x2)" entrava como 1, e a contagem do pedido ficava menor que a real.
+        // A localização vem de r.sku (respeita edição manual da tabela); a
+        // quantidade vem do sufixo "(xN)" da linha — ou de _rawSkus[i].q como
+        // fallback (caso single-item no formato "QTDE n — ...").
+        const cleanLoc = s => String(s||'')
+          .replace(/^\s*QTDE\s+\d+\s*[\u2014\u2013-]\s*/i,'')  // remove prefixo "QTDE n —"
+          .replace(/\s*\(x\d+\)\s*$/i,'')                       // remove sufixo "(xN)"
+          .trim();
+        const qtyOf = (line, idx) => {
+          const m = String(line||'').match(/\(x(\d+)\)\s*$/i);
+          if (m) return parseInt(m[1],10) || 1;
+          const rs = r._rawSkus[idx];
+          return (rs && rs.q) ? rs.q : 1;
+        };
+        // Localizações: uma linha por item em r.sku (alinhada 1:1 com r._rawSkus)
+        const skuLines = r.sku.split('\n').filter(s=>!s.startsWith('COM '));
+        // Nomes: um nome POR LINHA (robusto). Se o pedido tem um único produto e
+        // o nome foi editado manualmente, respeita a edição (lê de r.nome).
+        let lineNames = r._rawNames.slice();
+        const distinct = Array.from(new Set(r._rawNames));
+        if (distinct.length === 1) {
+          const editedName = r.nome.split('\n').map(l=>{
+            const m=l.match(/^\s*\d+\s*\*\s*"([\s\S]*)"\s*$/); return m?m[1]:l;
+          })[0];
+          if (editedName !== undefined && editedName !== '')
+            lineNames = r._rawSkus.map(()=>editedName);
+        }
+        const seen=new Map(), order=[];
+        for (let i=0;i<r._rawSkus.length;i++){
+          const name = lineNames[i]!==undefined ? lineNames[i] : (r._rawNames[i]||'');
+          let loc = skuLines[i]!==undefined ? cleanLoc(skuLines[i]) : resolveRawItem(r._rawSkus[i]);
+          if (loc==='S/ SKU') loc='';
+          const qty = qtyOf(skuLines[i], i);
+          const key = name+'\x00'+loc;
+          if (seen.has(key)) seen.get(key).count += qty;
+          else { const entry={name,loc,count:qty}; seen.set(key,entry); order.push(entry); }
+        }
+        itens = order.map(g=>({nome:g.count>1?g.count+' * "'+g.name+'"':g.name,loc:g.loc,qty:g.count}));
+        qtdTotal = order.reduce((s,g)=>s+g.count,0);  // total de unidades físicas
       } else {
         const nomes=r.nome.split('\n'); const skuLines=r.sku.split('\n').filter(s=>!s.startsWith('COM '));
-        itens=skuLines.length>1?skuLines.map((sku,idx)=>({nome:nomes[idx]||nomes[0],loc:sku.replace(/\s*\(x\d+\)\s*$/,'').trim()})):[{nome:nomes[0],loc:skuLines[0]||''}];
+        itens=skuLines.length>1?skuLines.map((sku,idx)=>({nome:nomes[idx]||nomes[0],loc:sku.replace(/\s*\(x\d+\)\s*$/,'').trim(),qty:1})):[{nome:nomes[0],loc:skuLines[0]||'',qty:1}];
+        qtdTotal = itens.length;
       }
-      return{id:r.id,qtd:itens.length,itens};
+      return{id:r.id,qtd:qtdTotal,itens};
     });
   }
 
@@ -1161,7 +1228,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sites=[{id:'SH',label:'Shopee',color:'var(--sh)'},{id:'ML',label:'Mercado Livre',color:'var(--ml)'},{id:'AZ',label:'Amazon',color:'var(--az)'},{id:'EV',label:'Estante Virtual',color:'var(--ev)'}];
     sites.forEach(site=>{
       const rows=allRows.filter(r=>r.site===site.id); if(!rows.length)return;
-      const groups=extractPickGroups(rows); const totalItens=groups.reduce((s,g)=>s+g.itens.length,0);
+      const groups=extractPickGroups(rows); const totalItens=groups.reduce((s,g)=>s+g.qtd,0);
       const block=document.createElement('div'); block.className='pick-site-block';
       const header=document.createElement('div'); header.className='pick-site-header';
       header.innerHTML=`<span class="mkt-badge" style="background:rgba(255,255,255,.07);color:${site.color}">${site.id}</span><span class="pick-site-title" style="color:${site.color}">${site.label}</span><span class="pick-count">${rows.length} pedido${rows.length!==1?'s':''} · ${totalItens} item${totalItens!==1?'s':''}</span>`;
@@ -1387,9 +1454,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function rowsToLabelRecipients(rows, platform) {
     return rows.map(function(r) {
       var end = r.destEnd || r.destEndFull || '';
-      var bairro = '';
-      // EV endereço pode ter bairro embutido
-      var parts = end.split(',');
+      // O bairro é mapeado na extração (AZ: coluna BG / EV: coluna U) e persiste
+      // em allRows — inclusive após "Restaurar Pedidos" (autosave em localStorage).
+      var bairro = r.destBairro || '';
       return { az: r.id, azPrefix: platform, nome: r.destNome || '', rua: end, bairro: bairro, cidade: r.destCidade || '', estado: r.destUF || '', cep: r.destCEP || '' };
     });
   }
@@ -1604,11 +1671,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const sitesData = [];
       ['SH','ML','AZ','EV'].forEach(s => {
         const rows = allRows.filter(r => r.site === s); if (!rows.length) return;
+        const groups = extractPickGroups(rows);
+        // qtd = unidades físicas (3 = 1×Produto A + 2×Produto B). itens.length = linhas
+        // de produtos distintos (2). A página externa deve preferir `qtd` quando presente,
+        // caindo em itens.length como fallback. qtdSite é o total já somado por site.
         sitesData.push({
           id: s, label: labelMap[s], hex: colorMap[s],
-          groups: extractPickGroups(rows).map(g => ({
+          qtdSite: groups.reduce((sum,g)=>sum+(g.qtd||g.itens.length), 0),
+          groups: groups.map(g => ({
             id: g.id,
-            itens: g.itens.map(it => ({ nome: it.nome, loc: it.loc || '' }))
+            qtd: g.qtd,
+            itens: g.itens.map(it => ({ nome: it.nome, loc: it.loc || '', qty: it.qty || 1 }))
           }))
         });
       });
@@ -1659,7 +1732,20 @@ document.addEventListener('DOMContentLoaded', () => {
       const sessionUrl = fbCfg.pickUrl ? fbCfg.pickUrl.replace(/\/?$/,'') + '?s=' + window._activeSession + '&db=' + encodeURIComponent(fbCfg.dbUrl) : null;
       const info = document.getElementById('monitorSessionInfo');
       info.innerHTML = '<span class="monitor-live-dot"></span> Sessão: <strong>' + window._activeSession + '</strong>' +
-        (sessionUrl ? ' &nbsp; <a href="' + sessionUrl + '" target="_blank">' + sessionUrl + '</a>' : '');
+        (sessionUrl
+          ? ' &nbsp; <a href="' + sessionUrl + '" target="_blank">' + sessionUrl + '</a>' +
+            ' <button type="button" class="copy-link-btn" id="copySessionLinkBtn" title="Copiar link da separação">\ud83d\udccb Copiar</button>'
+          : '');
+      if (sessionUrl) {
+        const copyBtn = document.getElementById('copySessionLinkBtn');
+        if (copyBtn) copyBtn.onclick = () => {
+          navigator.clipboard.writeText(sessionUrl).then(() => {
+            copyBtn.textContent = '\u2713 Copiado!';
+            copyBtn.classList.add('copied');
+            setTimeout(() => { copyBtn.textContent = '\ud83d\udccb Copiar'; copyBtn.classList.remove('copied'); }, 1800);
+          }).catch(() => toast('\u26a0 N\u00e3o foi poss\u00edvel copiar o link'));
+        };
+      }
       const body = document.getElementById('monitorBody');
       // Keep session info, rebuild rest
       while (body.children.length > 1) body.removeChild(body.lastChild);

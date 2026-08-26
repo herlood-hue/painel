@@ -41,9 +41,11 @@
   });
 })();
 </script>
+<!-- SheetJS: sem SRI — cdn.sheetjs.com não publica o pacote no npm/jsdelivr, então não há como
+     calcular o hash de integridade a partir de uma fonte independente verificável. -->
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" integrity="sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js" integrity="sha384-PlRSzpewlarQuj5alIadXwjNUX+2eNMKwr0f07ShWYLy8B6TjEbm7ZlcN/ScSbwy" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -196,6 +198,18 @@ tr:hover .del-btn{opacity:.7}
 .pick-loc.found{color:var(--accent)}
 @media print{.pick-header .pick-actions,.sidebar,.main-actions,.filter-bar{display:none!important}.pick-overlay{position:static}.pick-item.done{opacity:1}.pick-item.done .pick-nome{text-decoration:none}}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+/* ── ALVOS DE TOQUE MAIORES (tablet no estoque) ── */
+@media (pointer:coarse){
+  .icon-btn{width:44px;height:44px;font-size:1.05rem}
+  .clear-mkt-btn,.copy-mkt-btn{padding:.7rem .8rem;font-size:.78rem;min-height:44px}
+  .action-btn{padding:.65rem 1rem;min-height:44px}
+  .tab-btn{padding:.9rem 1.1rem;min-height:44px}
+  .del-btn{opacity:.7;padding:.5rem .6rem;font-size:1rem}
+  .id-cell{padding-top:.15rem;padding-bottom:.15rem}
+  /* botões maiores não cabem numa linha só na largura fixa da sidebar — permite quebrar */
+  .sidebar-header{flex-wrap:wrap;row-gap:.5rem}
+  .header-actions{flex-wrap:wrap;justify-content:flex-end}
+}
 /* ── CAIXA UNIVERSAL ── */
 .universal-box{background:linear-gradient(135deg,rgba(79,142,247,.09),rgba(79,142,247,.03));border:2px dashed var(--accent2);border-radius:var(--radius);padding:.75rem;transition:all .2s;cursor:pointer;position:relative;}
 .universal-box.drag-active{background:rgba(79,142,247,.18);border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,142,247,.15);}
@@ -676,6 +690,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return (s.includes(',') ? parseFloat(s.replace(/\./g,'').replace(',','.')) : parseFloat(s)) || 0;
   };
   const parseStr   = v => String(v!=null?v:'').trim();
+  // Escapa texto vindo de planilhas (nome, sku, id) antes de inserir via innerHTML —
+  // esses campos são controlados por terceiros (marketplace/comprador) e sem isso
+  // um nome de produto malicioso executa HTML/JS na tela de quem processa o pedido.
+  const escHtml = v => String(v!=null?v:'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const getSku     = raw => { const s=parseStr(raw); return skuMap.has(s)?skuMap.get(s):s; };
   // Resolve um item de SKU bruto. Itens marcados como variação (Shopee, coluna O)
   // NÃO passam pela base de SKUs — a variação é exibida exatamente como veio.
@@ -753,17 +771,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!e.target.files[0]) return;
     const reader = new FileReader();
     reader.onload = ev => {
-      const wb = XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
-      let si=-1, li=-1;
-      for (const row of rows) { if (row&&row.includes('SKU')&&row.includes('Cód. Interno')){ si=row.indexOf('SKU'); li=row.indexOf('Cód. Interno'); break; } }
-      if (si!==-1) {
-        skuMap.clear(); rows.forEach(r=>{ if(r[si]) skuMap.set(parseStr(r[si]),parseStr(r[li])); });
-        document.getElementById('skuStatus').textContent=`✓ ${skuMap.size} SKUs`; document.getElementById('skuStatus').style.color='var(--green)';
-        if (allRows.length>0) { allRows.forEach(r=>reResolveSku(r)); renderAll(); toast(`✓ ${skuMap.size} SKUs aplicados retroativamente`); }
-        else toast(`✓ ${skuMap.size} SKUs carregados`);
-      } else { document.getElementById('skuStatus').textContent='⚠ SKU/Cód. Interno não encontrado'; document.getElementById('skuStatus').style.color='var(--yellow)'; }
-      e.target.value='';
+      document.getElementById('skuStatus').textContent='⏳ Processando…'; document.getElementById('skuStatus').style.color='';
+      // setTimeout(...,0) deixa o navegador pintar o "processando…" antes do
+      // XLSX.read (síncrono e pesado em planilha grande) travar a aba.
+      setTimeout(()=>{
+        const wb = XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+        let si=-1, li=-1;
+        for (const row of rows) { if (row&&row.includes('SKU')&&row.includes('Cód. Interno')){ si=row.indexOf('SKU'); li=row.indexOf('Cód. Interno'); break; } }
+        if (si!==-1) {
+          skuMap.clear(); rows.forEach(r=>{ if(r[si]) skuMap.set(parseStr(r[si]),parseStr(r[li])); });
+          document.getElementById('skuStatus').textContent=`✓ ${skuMap.size} SKUs`; document.getElementById('skuStatus').style.color='var(--green)';
+          if (allRows.length>0) { allRows.forEach(r=>reResolveSku(r)); renderAll(); toast(`✓ ${skuMap.size} SKUs aplicados retroativamente`); }
+          else toast(`✓ ${skuMap.size} SKUs carregados`);
+        } else { document.getElementById('skuStatus').textContent='⚠ SKU/Cód. Interno não encontrado'; document.getElementById('skuStatus').style.color='var(--yellow)'; }
+        e.target.value='';
+      },0);
     };
     reader.readAsArrayBuffer(e.target.files[0]);
   };
@@ -997,8 +1020,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateStats() {
     document.getElementById('stat-total').textContent=allRows.length;
     ['SH','ML','AZ','EV'].forEach(s=>{
-      document.getElementById('stat-'+s.toLowerCase()).textContent=allRows.filter(r=>r.site===s).length;
       const n=allRows.filter(r=>r.site===s).length;
+      document.getElementById('stat-'+s.toLowerCase()).textContent=n;
       const el=document.getElementById('count-'+s); el.textContent=n>0?`${n} pedido${n>1?'s':''} carregado${n>1?'s':''}`:'';
       const mktId={SH:'mkt-sh',ML:'mkt-ml',AZ:'mkt-az',EV:'mkt-ev'}[s];
       document.getElementById(mktId).classList.toggle('has-data',n>0);
@@ -1030,20 +1053,20 @@ document.addEventListener('DOMContentLoaded', () => {
       const siteCls={SH:'site-sh',ML:'site-ml',AZ:'site-az',EV:'site-ev'}[d.site]||'';
       const liqVal=d.liq!=null?fmt(d.liq):''; const liqClass=d.liq!=null?(d.liq>=0?'num-pos':'num-neg'):'';
       const nomeParts=d.nome.split('\n');
-      const nomeHtml=nomeParts.length>1?nomeParts.map((n,i)=>i<nomeParts.length-1?`${n}<span class="nome-sep">;</span>`:n).join(''):d.nome;
+      const nomeHtml=nomeParts.length>1?nomeParts.map((n,i)=>i<nomeParts.length-1?`${escHtml(n)}<span class="nome-sep">;</span>`:escHtml(n)).join(''):escHtml(d.nome);
       const skuLines=d.sku.split('\n'); let skuHtml='';
-      if(skuLines.length>1&&skuLines[0].startsWith('COM ')) { skuHtml=`<span class="sku-count">${skuLines[0]}</span>`+skuLines.slice(1).join('<br>'); }
-      else { skuHtml=skuLines.join('<br>'); }
+      if(skuLines.length>1&&skuLines[0].startsWith('COM ')) { skuHtml=`<span class="sku-count">${escHtml(skuLines[0])}</span>`+skuLines.slice(1).map(escHtml).join('<br>'); }
+      else { skuHtml=skuLines.map(escHtml).join('<br>'); }
       tr.innerHTML=`
         <td style="padding:0 .3rem;text-align:center"><span class="drag-handle" title="Arrastar para reordenar">⠿</span></td>
         <td><span class="site-badge ${siteCls}">${dupIcon}${d.site}</span></td>
-        <td class="id-cell" title="${d.id}" data-copyid="${d.id}">${d.id}</td>
+        <td class="id-cell" title="${escHtml(d.id)}" data-copyid="${escHtml(d.id)}">${escHtml(d.id)}</td>
         <td class="num-cell editable" data-field="prod" contenteditable="false">${fmt(d.prod)}</td>
         <td class="num-cell editable" data-field="frete" contenteditable="false">${fmt(d.frete)}</td>
         <td class="num-cell editable" data-field="total" contenteditable="false">${fmt(d.total)}</td>
         <td class="nome-cell editable" data-field="nome" contenteditable="false">${nomeHtml}</td>
-        <td class="editable" style="font-size:.67rem;color:var(--text3);white-space:nowrap" data-field="status" contenteditable="false">${d.status}</td>
-        <td style="font-family:var(--mono);font-size:.67rem;color:var(--text3);white-space:nowrap">${d.cod}</td>
+        <td class="editable" style="font-size:.67rem;color:var(--text3);white-space:nowrap" data-field="status" contenteditable="false">${escHtml(d.status)}</td>
+        <td style="font-family:var(--mono);font-size:.67rem;color:var(--text3);white-space:nowrap">${escHtml(d.cod||'')}</td>
         <td class="sku-cell editable" data-field="sku" contenteditable="false">${skuHtml}</td>
         <td class="num-cell liq-cell ${liqClass} editable" data-field="liq" contenteditable="false">${liqVal}</td>
         <td class="num-cell comm-cell">${d.comm!=null?fmt(d.comm):''}</td>
@@ -1105,29 +1128,41 @@ document.addEventListener('DOMContentLoaded', () => {
     Array.from(files).forEach(file=>{
       const reader=new FileReader();
       reader.onload=e=>{
-        try {
-          const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
-          const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
-          const plat=identificarMarketplace(rows);
-          if(!plat){appendAutoLog(log,file.name,null,'⚠ Não reconhecido');toast(`⚠ ${file.name}: marketplace não identificado`,4000);return;}
-          if(plat==='amazon')  window._rawWorkbooks.AZ=wb;
-          if(plat==='estante') window._rawWorkbooks.EV=wb;
-          const parsed=strategies[plat](rows);
-          const labels={shopee:'Shopee',mercadolivre:'Mercado Livre',amazon:'Amazon',estante:'Estante Virtual'};
-          const codes={shopee:'SH',mercadolivre:'ML',amazon:'AZ',estante:'EV'};
-          if(!parsed.length){appendAutoLog(log,file.name,codes[plat],`${labels[plat]} — 0 pedidos`);toast(`⚠ Nenhum pedido em ${file.name}`,3000);}
-          else{appendAutoLog(log,file.name,codes[plat],`${labels[plat]} — ${parsed.length} pedido${parsed.length>1?'s':''}`);addRows(parsed);}
-        } catch(err){appendAutoLog(log,file.name,null,`Erro: ${err.message}`);toast(`⚠ Erro em ${file.name}: ${err.message}`,4000);console.error(err);}
+        const logItem=startAutoLog(log,file.name);
+        // setTimeout(...,0) deixa o navegador pintar o "processando…" antes do
+        // XLSX.read (síncrono e pesado em planilha grande) travar a aba.
+        setTimeout(()=>{
+          try {
+            const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+            const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+            const plat=identificarMarketplace(rows);
+            if(!plat){appendAutoLog(log,file.name,null,'⚠ Não reconhecido',logItem);toast(`⚠ ${file.name}: marketplace não identificado`,4000);return;}
+            if(plat==='amazon')  window._rawWorkbooks.AZ=wb;
+            if(plat==='estante') window._rawWorkbooks.EV=wb;
+            const parsed=strategies[plat](rows);
+            const labels={shopee:'Shopee',mercadolivre:'Mercado Livre',amazon:'Amazon',estante:'Estante Virtual'};
+            const codes={shopee:'SH',mercadolivre:'ML',amazon:'AZ',estante:'EV'};
+            if(!parsed.length){appendAutoLog(log,file.name,codes[plat],`${labels[plat]} — 0 pedidos`,logItem);toast(`⚠ Nenhum pedido em ${file.name}`,3000);}
+            else{appendAutoLog(log,file.name,codes[plat],`${labels[plat]} — ${parsed.length} pedido${parsed.length>1?'s':''}`,logItem);addRows(parsed);}
+          } catch(err){appendAutoLog(log,file.name,null,`Erro: ${err.message}`,logItem);toast(`⚠ Erro em ${file.name}: ${err.message}`,4000);console.error(err);}
+        },0);
       };
       reader.readAsArrayBuffer(file);
     });
   }
-  function appendAutoLog(log,filename,code,msg){
+  function appendAutoLog(log,filename,code,msg,item){
     const cls=code?`ok-${code.toLowerCase()}`:'err';
     const icon={SH:'🟠',ML:'🟡',AZ:'🔵',EV:'🟢'}[code]||'❌';
-    const item=document.createElement('div'); item.className=`universal-log-item ${cls}`;
+    if(!item){ item=document.createElement('div'); log.prepend(item); while(log.children.length>12)log.removeChild(log.lastChild); }
+    item.className=`universal-log-item ${cls}`;
     item.textContent=`${icon} ${filename.length>22?filename.slice(0,20)+'…':filename} → ${msg}`;
+    return item;
+  }
+  function startAutoLog(log,filename){
+    const item=document.createElement('div'); item.className='universal-log-item';
+    item.textContent=`⏳ ${filename.length>22?filename.slice(0,20)+'…':filename} → processando…`;
     log.prepend(item); while(log.children.length>12)log.removeChild(log.lastChild);
+    return item;
   }
 
   window._rawWorkbooks={AZ:null,EV:null};
@@ -1136,14 +1171,19 @@ document.addEventListener('DOMContentLoaded', () => {
     Array.from(files).forEach(file=>{
       const reader=new FileReader();
       reader.onload=e=>{
-        try{
-          const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
-          if(platform==='amazon')  window._rawWorkbooks.AZ=wb;
-          if(platform==='estante') window._rawWorkbooks.EV=wb;
-          const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
-          const parsed=strategies[platform](rows);
-          if(!parsed.length)toast(`⚠ Nenhum pedido em ${file.name}`,3000); else addRows(parsed);
-        }catch(err){toast(`⚠ Erro: ${err.message}`,4000);console.error(err);}
+        toast(`⏳ Processando ${file.name}…`,2000);
+        // setTimeout(...,0) deixa o navegador pintar o toast antes do
+        // XLSX.read (síncrono e pesado em planilha grande) travar a aba.
+        setTimeout(()=>{
+          try{
+            const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+            if(platform==='amazon')  window._rawWorkbooks.AZ=wb;
+            if(platform==='estante') window._rawWorkbooks.EV=wb;
+            const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+            const parsed=strategies[platform](rows);
+            if(!parsed.length)toast(`⚠ Nenhum pedido em ${file.name}`,3000); else addRows(parsed);
+          }catch(err){toast(`⚠ Erro: ${err.message}`,4000);console.error(err);}
+        },0);
       };
       reader.readAsArrayBuffer(file);
     });
@@ -1343,13 +1383,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const ul=document.createElement('ul'); ul.className='pick-list';
       groups.forEach(group=>{
         const groupEl=document.createElement('li'); groupEl.className='pick-group';
-        const shortId=group.id.length>20?group.id.substring(0,20)+'…':group.id;
+        const shortId=escHtml(group.id.length>20?group.id.substring(0,20)+'…':group.id);
         const multiTag=group.qtd>1?`<span class="pick-group-badge">${group.qtd} itens</span>`:'';
         groupEl.innerHTML=`<div class="pick-group-header"><span class="pick-order-id">Pedido ${shortId}</span>${multiTag}</div>`;
         group.itens.forEach(item=>{
           const hasLoc=item.loc&&item.loc!=='S/ SKU'&&item.loc!=='';
           const li=document.createElement('div'); li.className='pick-item';
-          li.innerHTML=`<div class="pick-check"></div><div style="flex:1;min-width:0"><div class="pick-nome">${item.nome}</div><div class="pick-loc${hasLoc?' found':''}">${hasLoc?item.loc:'—'}</div></div>`;
+          li.innerHTML=`<div class="pick-check"></div><div style="flex:1;min-width:0"><div class="pick-nome">${escHtml(item.nome)}</div><div class="pick-loc${hasLoc?' found':''}">${hasLoc?escHtml(item.loc):'—'}</div></div>`;
           li.onclick=()=>{ const done=li.classList.toggle('done'); li.querySelector('.pick-check').textContent=done?'✓':''; };
           groupEl.appendChild(li);
         });
@@ -1912,10 +1952,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const groups = extractPickGroups(rows);
       html += '<div class="site"><div class="site-hdr"><span style="background:rgba(255,255,255,.07);color:' + colors[s] + ';padding:2px 5px;border-radius:4px;font-size:.62rem">' + s + '</span><span style="color:' + colors[s] + '">' + labels[s] + '</span><span style="margin-left:auto;font-size:.65rem;color:#4f617a">' + rows.length + ' pedidos</span></div>';
       groups.forEach(g => {
-        html += '<div class="group"><div class="group-hdr">Pedido ' + g.id + '</div>';
+        html += '<div class="group"><div class="group-hdr">Pedido ' + escHtml(g.id) + '</div>';
         g.itens.forEach(it => {
           const hasLoc = it.loc && it.loc !== 'S/ SKU' && it.loc !== '';
-          html += '<div class="item" onclick="this.classList.toggle(\'done\');this.querySelector(\'.check\').textContent=this.classList.contains(\'done\')?\'✓\':\'\'"><div class="check"></div><div style="flex:1"><div class="nome">' + it.nome + '</div>' + (hasLoc ? '<div class="loc">' + it.loc + '</div>' : '') + '</div></div>';
+          html += '<div class="item" onclick="this.classList.toggle(\'done\');this.querySelector(\'.check\').textContent=this.classList.contains(\'done\')?\'✓\':\'\'"><div class="check"></div><div style="flex:1"><div class="nome">' + escHtml(it.nome) + '</div>' + (hasLoc ? '<div class="loc">' + escHtml(it.loc) + '</div>' : '') + '</div></div>';
         });
         html += '</div>';
       });

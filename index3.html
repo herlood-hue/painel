@@ -4,8 +4,45 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Processador de Planilhas v14.0</title>
+<script>
+// ── TRATAMENTO DE ERRO GLOBAL ── captura erros mesmo se quebrarem a inicialização dos botões
+(function(){
+  function showErrorBanner(msg){
+    try{
+      var render=function(){
+        var el=document.getElementById('errorBanner');
+        if(!el){
+          el=document.createElement('div');
+          el.id='errorBanner';
+          el.setAttribute('role','alert');
+          el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#d44040;color:#fff;padding:.6rem 1rem;font:600 .8rem/1.4 system-ui,sans-serif;display:flex;align-items:center;justify-content:space-between;gap:1rem;box-shadow:0 2px 8px rgba(0,0,0,.35)';
+          document.body.prepend(el);
+        }
+        var span=document.createElement('span');
+        span.textContent='⚠ Erro inesperado: '+msg+' — recarregue a página; se persistir, avise o suporte.';
+        var btn=document.createElement('button');
+        btn.textContent='Fechar';
+        btn.style.cssText='flex:none;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:4px;padding:.15rem .6rem;cursor:pointer;font:inherit';
+        btn.onclick=function(){ el.remove(); };
+        el.innerHTML=''; el.appendChild(span); el.appendChild(btn);
+      };
+      if(document.body) render(); else document.addEventListener('DOMContentLoaded', render);
+    }catch(e){}
+  }
+  window.addEventListener('error', function(e){
+    var msg=(e && e.message) || 'erro desconhecido';
+    if(e && e.filename) msg += ' ('+e.filename.split('/').pop()+':'+e.lineno+')';
+    showErrorBanner(msg);
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    var reason=e && e.reason;
+    var msg=(reason && reason.message) ? reason.message : String(reason);
+    showErrorBanner('Promise rejeitada — '+msg);
+  });
+})();
+</script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -113,6 +150,10 @@ tbody tr.hidden-row{display:none}
 .empty-icon{font-size:2.2rem;opacity:.4}.empty-text{font-size:.8rem}
 .toast{position:fixed;bottom:1.25rem;right:1.25rem;background:var(--bg4);border:1px solid var(--border2);padding:.5rem .9rem;border-radius:var(--radius);font-size:.75rem;font-weight:600;color:var(--text);opacity:0;transform:translateY(8px);transition:all .2s;z-index:200;pointer-events:none}
 .toast.show{opacity:1;transform:translateY(0)}
+.toast-undo{position:fixed;bottom:1.25rem;right:1.25rem;background:var(--bg4);border:1px solid var(--border2);padding:.5rem .6rem .5rem .9rem;border-radius:var(--radius);font-size:.75rem;font-weight:600;color:var(--text);opacity:0;transform:translateY(8px);transition:all .2s;z-index:200;pointer-events:none;display:flex;align-items:center;gap:.6rem}
+.toast-undo.show{opacity:1;transform:translateY(0);pointer-events:auto}
+.toast-undo button{background:var(--accent);color:#fff;border:none;border-radius:calc(var(--radius) - 2px);padding:.3rem .6rem;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit}
+.toast-undo button:hover{background:var(--accent2)}
 .dup-panel{padding:.55rem 1.25rem;background:rgba(248,113,113,.06);border-bottom:1px solid rgba(248,113,113,.2);font-size:.7rem;color:var(--dup);display:none;gap:.4rem;align-items:flex-start;flex-wrap:wrap}
 .dup-panel.visible{display:flex}.dup-panel strong{font-weight:700}
 /* ── EDIÇÃO DE LINHAS ── */
@@ -564,6 +605,7 @@ tr:hover .del-btn{opacity:.7}
         <span class="monitor-live-dot" id="monitorDot"></span>
         <span style="font-size:.65rem;color:var(--text3)" id="monitorLastUpdate">Aguardando dados…</span>
       </div>
+      <button class="action-btn" id="monitorEndSessionBtn" title="Apaga os dados da sessão no Firebase (nome, endereço, itens) — encerra o acesso pelo link" style="padding:.3rem .6rem;font-size:.68rem;background:rgba(240,92,92,.12);border:1px solid rgba(240,92,92,.35);color:var(--red)">🗑 Encerrar sessão</button>
       <button class="action-btn btn-red" id="monitorCloseBtn" style="padding:.3rem .6rem;font-size:.68rem">✕ Fechar</button>
     </div>
     <div class="monitor-body" id="monitorBody">
@@ -584,7 +626,24 @@ tr:hover .del-btn{opacity:.7}
       <div class="modal-field">
         <label>Firebase Realtime Database URL</label>
         <input type="url" id="fbDbUrl" placeholder="https://SEU-PROJETO-default-rtdb.firebaseio.com">
-        <small>Crie um projeto gratuito em <strong>firebase.google.com</strong> → Realtime Database → copie a URL aqui. Regras: read/write = true para <code>pick_sessions</code>.</small>
+        <small>Crie um projeto gratuito em <strong>firebase.google.com</strong> → Realtime Database → copie a URL aqui.
+          ⚠ Quem tiver essa URL + o link de separação consegue ler/alterar os dados. Configure as <strong>Regras</strong> do banco (aba "Rules" no console Firebase) assim, para exigir expiração e limitar o tamanho da janela de exposição:</small>
+        <details style="margin-top:.4rem">
+          <summary style="cursor:pointer;font-size:.7rem;color:var(--text2)">Ver regras recomendadas</summary>
+          <pre style="font-size:.65rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.6rem;overflow:auto;margin-top:.4rem">{
+  "rules": {
+    "pick_sessions": {
+      "$sessionId": {
+        ".read": true,
+        ".write": "!data.exists() || newData.child('meta/expiresAt').exists()",
+        ".validate": "newData.hasChildren(['meta','sitesData']) && newData.child('meta/expiresAt').val() <= now + 172800000"
+      }
+    },
+    "$other": { ".read": false, ".write": false }
+  }
+}</pre>
+          <small>Isso exige que toda sessão tenha expiração (máx. 48h) e bloqueia leitura/escrita fora de <code>pick_sessions</code>. O app já expira e apaga a sessão automaticamente (24h, ou manualmente pelo botão "Encerrar sessão"), mas essas regras são a única proteção real contra terceiros lendo/editando o banco direto pela URL.</small>
+        </details>
       </div>
       <div class="modal-field">
         <label>URL da Página de Separação (opcional)</label>
@@ -601,6 +660,7 @@ tr:hover .del-btn{opacity:.7}
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="toast-undo" id="toastUndo"><span id="toastUndoMsg"></span><button id="toastUndoBtn">Desfazer</button></div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -608,7 +668,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let skuMap = new Map(), allRows = [], activeFilter = 'ALL', searchQuery = '', sortCol = -1, sortDir = 1;
 
   const fmt = v => { if (v===''||v==null) return ''; const n=typeof v==='string'?parseFloat(v.replace(',','.')):Number(v); return isNaN(n)?String(v):n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); };
-  const parseMoney = v => parseFloat(String(v??'0').replace(',','.')) || 0;
+  const parseMoney = v => {
+    if (v === '' || v == null) return 0;
+    if (typeof v === 'number') return v;
+    const s = String(v).trim();
+    // formato BR ("1.234,56" ou "234,56"): remove separador de milhar antes de trocar vírgula por ponto
+    return (s.includes(',') ? parseFloat(s.replace(/\./g,'').replace(',','.')) : parseFloat(s)) || 0;
+  };
   const parseStr   = v => String(v!=null?v:'').trim();
   const getSku     = raw => { const s=parseStr(raw); return skuMap.has(s)?skuMap.get(s):s; };
   // Resolve um item de SKU bruto. Itens marcados como variação (Shopee, coluna O)
@@ -637,12 +703,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── AUTO-SAVE localStorage ──
   const AUTOSAVE_KEY = 'proc_autosave_v13';
+  const AUTOSAVE_TTL_MS = 48 * 3600000; // 48h — dados pessoais de clientes não ficam guardados indefinidamente (LGPD)
   function autoSave() { try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ rows: allRows, savedAt: Date.now() })); } catch(e) {} }
   function autoLoad() {
     try {
       const raw = localStorage.getItem(AUTOSAVE_KEY); if (!raw) return;
       const data = JSON.parse(raw); if (!data.rows || !data.rows.length) return;
       const age = Date.now() - (data.savedAt || 0);
+      if (age > AUTOSAVE_TTL_MS) { localStorage.removeItem(AUTOSAVE_KEY); return; }
       const horas = Math.floor(age / 3600000), mins = Math.floor((age % 3600000) / 60000);
       const ageStr = horas > 0 ? `${horas}h ${mins}min atrás` : `${mins}min atrás`;
       document.getElementById('restoreMsg').textContent = `💾 ${data.rows.length} pedidos salvos automaticamente (${ageStr}) — restaurar?`;
@@ -660,6 +728,16 @@ document.addEventListener('DOMContentLoaded', () => {
   window.dismissRestore = function() { localStorage.removeItem(AUTOSAVE_KEY); document.getElementById('restoreBanner').style.display = 'none'; };
 
   const toast = (msg, dur=2200) => { const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'), dur); };
+
+  let _toastUndoTimer=null;
+  const toastUndo = (msg, onUndo, dur=12000) => {
+    const el=document.getElementById('toastUndo'), btn=document.getElementById('toastUndoBtn');
+    document.getElementById('toastUndoMsg').textContent=msg;
+    el.classList.add('show');
+    clearTimeout(_toastUndoTimer);
+    _toastUndoTimer=setTimeout(()=>el.classList.remove('show'), dur);
+    btn.onclick=()=>{ el.classList.remove('show'); clearTimeout(_toastUndoTimer); onUndo(); };
+  };
 
   // Tema
   document.getElementById('darkToggle').onclick = () => {
@@ -1088,21 +1166,37 @@ document.addEventListener('DOMContentLoaded', () => {
   })();
 
   document.getElementById('clearBtn').onclick=()=>{
+    if(!allRows.length){toast('Nenhum dado para limpar');return;}
+    const n=allRows.length;
+    if(!confirm(`Isso vai apagar ${n} pedido${n>1?'s':''} carregado${n>1?'s':''} e o salvamento automático. Deseja continuar?`)) return;
+    const backupRows=allRows, backupWorkbooks=window._rawWorkbooks?{...window._rawWorkbooks}:null;
     allRows=[];
     if(window._rawWorkbooks)window._rawWorkbooks={AZ:null,EV:null};
     document.getElementById('dataTableBody').innerHTML='';
     document.getElementById('emptyState').style.display='flex';
     document.getElementById('mainTable').style.display='none';
     document.getElementById('dupPanel').classList.remove('visible');
-    updateStats(); updateAvgComm(); localStorage.removeItem(AUTOSAVE_KEY); toast('Todos os dados limpos');
+    updateStats(); updateAvgComm(); localStorage.removeItem(AUTOSAVE_KEY);
+    toastUndo(`${n} pedido${n>1?'s':''} apagado${n>1?'s':''}`, ()=>{
+      allRows=backupRows;
+      if(backupWorkbooks)window._rawWorkbooks=backupWorkbooks;
+      showDupPanel(detectDuplicates(allRows)); renderAll(); autoSave(); toast('✓ Restaurado');
+    });
   };
   document.querySelectorAll('.clear-mkt-btn').forEach(btn=>{
     btn.onclick=()=>{
-      const plat=btn.dataset.plat; const before=allRows.length;
-      allRows=allRows.filter(r=>r.site!==plat); const removed=before-allRows.length;
-      if(!removed){toast(`Nenhum pedido de ${plat} carregado`);return;}
+      const plat=btn.dataset.plat;
+      const removedRows=allRows.filter(r=>r.site===plat);
+      if(!removedRows.length){toast(`Nenhum pedido de ${plat} carregado`);return;}
+      const backupWb=(plat==='AZ'||plat==='EV')&&window._rawWorkbooks?window._rawWorkbooks[plat]:null;
+      allRows=allRows.filter(r=>r.site!==plat);
       if((plat==='AZ'||plat==='EV')&&window._rawWorkbooks)window._rawWorkbooks[plat]=null;
-      showDupPanel(detectDuplicates(allRows)); renderAll(); autoSave(); toast(`✓ ${removed} pedidos de ${plat} removidos`);
+      showDupPanel(detectDuplicates(allRows)); renderAll(); autoSave();
+      toastUndo(`${removedRows.length} pedidos de ${plat} removidos`, ()=>{
+        allRows=allRows.concat(removedRows);
+        if(backupWb&&window._rawWorkbooks)window._rawWorkbooks[plat]=backupWb;
+        showDupPanel(detectDuplicates(allRows)); renderAll(); autoSave(); toast('✓ Restaurado');
+      });
     };
   });
 
@@ -1166,6 +1260,19 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pickShareBtn').onclick=()=>generatePickPage();
   document.getElementById('pickPublishBtn').onclick=()=>publishPickOnline();
   document.getElementById('monitorCloseBtn').onclick=()=>{ document.getElementById('monitorPanel').classList.remove('open'); stopMonitor(); };
+  document.getElementById('monitorEndSessionBtn').onclick=async ()=>{
+    if (!fbCfg?.dbUrl || !window._activeSession) { toast('Nenhuma sessão ativa'); return; }
+    if (!confirm('Isso apaga os dados da sessão (nomes, endereços, itens) no Firebase e derruba o acesso de quem estiver com o link. Confirma?')) return;
+    try {
+      const url = fbCfg.dbUrl.replace(/\/?$/,'') + '/pick_sessions/' + window._activeSession + '.json';
+      const res = await fetch(url, { method: 'DELETE' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      toast('✓ Sessão encerrada e dados removidos do Firebase');
+      stopMonitor(); document.getElementById('monitorPanel').classList.remove('open');
+      document.getElementById('pickMonitorBtn').style.display = 'none';
+      window._activeSession = null;
+    } catch(err) { toast('⚠ Erro ao encerrar sessão: ' + err.message, 5000); }
+  };
   document.getElementById('pickMonitorBtn').onclick=()=>{ document.getElementById('monitorPanel').classList.add('open'); startMonitor(); };
 
   function extractPickGroups(rows) {
@@ -1685,8 +1792,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }))
         });
       });
+      const SESSION_TTL_MS = 24 * 3600000; // sessão expira em 24h — dados de clientes não ficam expostos indefinidamente pelo link
       const data = {
-        meta: { sessionId, dateStr: now.toLocaleDateString('pt-BR'), timeStr: now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) },
+        meta: { sessionId, dateStr: now.toLocaleDateString('pt-BR'), timeStr: now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}), expiresAt: now.getTime() + SESSION_TTL_MS },
         sitesData,
         state: {}
       };

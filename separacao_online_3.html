@@ -1027,6 +1027,11 @@ async function loadSession() {
     const raw = await res.json();
     if (!raw || !raw.sitesData) throw new Error('Sessão não encontrada ou expirada.');
 
+    if (raw.meta && raw.meta.expiresAt && Date.now() > raw.meta.expiresAt) {
+      fetch(`${DB_URL}/pick_sessions/${SESSION}.json`, { method: 'DELETE' }).catch(() => {});
+      throw new Error('Sessão expirada. Peça para gerar um novo link de separação.');
+    }
+
     session = raw;
     state   = raw.state || {};
 

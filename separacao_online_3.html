@@ -1183,7 +1183,7 @@ function buildEmployee() {
       const row = el('div', 'order-row');
       row.id = `orow-${si}-${gi}`;
 
-      const shortId = group.id.length > 26 ? group.id.slice(0, 26) + '…' : group.id;
+      const shortId = escHtml(group.id.length > 26 ? group.id.slice(0, 26) + '…' : group.id);
       const CIRC = (2 * Math.PI * 15.9).toFixed(2);
 
       row.innerHTML = `
@@ -1508,7 +1508,7 @@ function refreshAdminState() {
     card.appendChild(hdr);
 
     site.orders.forEach(o => {
-      const shortId = o.id.length > 30 ? o.id.slice(0, 30) + '…' : o.id;
+      const shortId = escHtml(o.id.length > 30 ? o.id.slice(0, 30) + '…' : o.id);
       const isDone    = o.done === o.total && o.total > 0;
       const isPartial = o.done > 0 && !isDone;
       const cls = isDone ? 'badge-done' : isPartial ? 'badge-partial' : 'badge-pending';

@@ -340,7 +340,13 @@ body {
 .site-stat-badge.s-items  { color: var(--text3); }
 .site-stat-sep { color: var(--border2); font-size: .6rem; }
 
-/* ── ORDER ROW ── */
+/* ── ALERTA DE VOLUME / EDIÇÃO ── */
+ .volume-badge{display:inline-flex;align-items:center;gap:.35rem;margin-bottom:.45rem;padding:.35rem .65rem .35rem .55rem;background:linear-gradient(135deg,#ff6262,#d92332);color:#fff;border-radius:8px;font-size:.82rem;font-weight:800;line-height:1.2;letter-spacing:.01em;box-shadow:0 2px 7px rgba(217,35,50,.35);border:1px solid rgba(120,0,0,.28);animation:volume-pulse 1.8s ease-in-out infinite}
+ body.dark .volume-badge{background:linear-gradient(135deg,#ff7777,#c91f32);color:#fff;border-color:rgba(255,120,120,.5);box-shadow:0 2px 10px rgba(220,35,50,.4)}
+ @keyframes volume-pulse{0%,100%{box-shadow:0 2px 6px rgba(217,35,50,.3)}50%{box-shadow:0 2px 14px rgba(217,35,50,.65)}}
+ .pick-item.done .volume-badge{animation:none;opacity:.6;filter:saturate(.6)}
+
+ /* ── ORDER ROW ── */
 .order-row {
   border-top: 1px solid var(--border);
   cursor: pointer;
@@ -870,6 +876,17 @@ body.dark .qty-multiplier {
 //  publicador; quando ausente (payloads antigos), o peso é extraído do prefixo
 //  "N * ..." no nome — e cai em 1 como último recurso.
 // ══════════════════════════════════════════
+function extractEditionMarker(title){
+  const text=String(title||"");
+  const patterns=[
+    /\b(?:volume|vol\.?|v\.)\s*[:#º°-]?\s*([\d]+|[ivxlcdm]+)\b/i,
+    /\b(?:número|numero|n[º°o.]?)\s*[:#-]?\s*([\d]+)\b/i,
+    /\b(?:tomo|parte|fasc[ií]culo|caderno|edição|ed\.?|livro)\s*[:#º°-]?\s*([\d]+|[ivxlcdm]+)\b/i
+  ];
+  for(const re of patterns){const m=text.match(re);if(m)return m[0].replace(/\s+/g," ").trim().replace(/[:#-]+$/,"");}
+  return "";
+}
+
 function itemQty(item) {
   if (item && typeof item.qty === 'number' && item.qty > 0) return item.qty;
   if (item && item.nome) {
@@ -1232,6 +1249,11 @@ function buildEmployee() {
         const wrap = nomeDisp.match(/^\s*\d+\s*\*\s*"([\s\S]*)"\s*$/);
         if (wrap) nomeDisp = wrap[1];
 
+        const editionMarker=extractEditionMarker(nomeDisp);
+        const volumeBadgeHtml=editionMarker
+          ? `<div class="volume-badge">⚠️ ATENÇÃO: ${escHtml(editionMarker)}</div>`
+          : "";
+
         const nomeHtml = isMulti
           ? `<span class="qty-multiplier">${qty}\u00d7</span>${escHtml(nomeDisp)}`
           : escHtml(nomeDisp);
@@ -1243,6 +1265,7 @@ function buildEmployee() {
         div.innerHTML = `
           <div class="pick-cb">${state[key] ? '\u2713' : ''}</div>
           <div class="pick-text">
+            ${volumeBadgeHtml}
             ${qtyBadgeHtml}
             <div class="pick-nome">${nomeHtml}</div>
             <div class="pick-loc${hasLoc ? ' has-loc' : ''}">${hasLoc ? escHtml(item.loc) : '\u2014'}</div>

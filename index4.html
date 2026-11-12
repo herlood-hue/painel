@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Processador de Planilhas v14.1 — Testes</title>
+<title>Processador de Planilhas v14.2 — Testes</title>
 <script>
 // ── TRATAMENTO DE ERRO GLOBAL ── captura erros mesmo se quebrarem a inicialização dos botões
 (function(){
@@ -516,6 +516,9 @@ tr:hover .del-btn{opacity:.7}
         <span class="decl-status" id="declEvInfo">Selecione a planilha ou use os pedidos carregados.</span>
       </div>
     </div>
+    <div style="display:flex;justify-content:flex-end;padding:.45rem 1rem;border-bottom:1px solid var(--border);">
+      <button class="action-btn btn-accent" id="declBaixarUnificadoBtn" disabled>⬇ Baixar declarações unificadas (Amazon + Estante)</button>
+    </div>
     <div class="decl-pdf-area">
       <div class="decl-pdf-col" id="declAzWrap">
         <div class="decl-empty"><div class="decl-empty-icon">📄</div><div class="decl-empty-text">Amazon — aguardando</div></div>
@@ -567,6 +570,9 @@ tr:hover .del-btn{opacity:.7}
         </div>
         <span class="decl-status" id="etiqEvInfo">Selecione a planilha ou use os pedidos carregados.</span>
       </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;padding:.45rem 1rem;border-bottom:1px solid var(--border);">
+      <button class="action-btn btn-accent" id="etiqBaixarUnificadoBtn" disabled>⬇ Baixar etiquetas unificadas (Amazon + Estante)</button>
     </div>
     <div class="decl-pdf-area">
       <div class="decl-pdf-col" id="etiqWrapAz">
@@ -1398,6 +1404,18 @@ document.addEventListener('DOMContentLoaded', () => {
   window._declAzFile=null; window._declEvFile=null;
   let declAzPdfBlob=null,declEvPdfBlob=null;
 
+  // Junta PDFs originais, sem rasterizar ou redesenhar páginas.
+  async function mergePdfBlobsInOrder(firstBlob,secondBlob){
+    if(!firstBlob||!secondBlob) throw new Error('Gere primeiro os arquivos da Amazon e da Estante Virtual.');
+    const merged=await PDFLib.PDFDocument.create();
+    for(const blob of [firstBlob,secondBlob]){
+      const source=await PDFLib.PDFDocument.load(await blob.arrayBuffer());
+      const pages=await merged.copyPages(source,source.getPageIndices());
+      pages.forEach(page=>merged.addPage(page));
+    }
+    return new Blob([await merged.save()],{type:'application/pdf'});
+  }
+
   function declStatusSide(side,msg,type){ const el=document.getElementById('decl'+side+'Info'); if(!el)return; el.textContent=msg; el.className='decl-status'+(type?' '+type:''); }
 
   function updateDeclCounts() {
@@ -1483,7 +1501,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const pdfBytes=await pdfDoc.save(),blob=new Blob([pdfBytes],{type:'application/pdf'}),url=URL.createObjectURL(blob);
     if(plataforma==='AZ')declAzPdfBlob=blob; else declEvPdfBlob=blob;
     const viewer=document.getElementById(viewerId),wrap=document.getElementById(wrapId),empty=wrap.querySelector('.decl-empty');
-    if(empty)empty.style.display='none'; viewer.src=url; viewer.style.display='block'; document.getElementById(dlBtnId).style.display=''; return count;
+    if(empty)empty.style.display='none'; viewer.src=url; viewer.style.display='block'; document.getElementById(dlBtnId).style.display='';
+    document.getElementById('declBaixarUnificadoBtn').disabled=!(declAzPdfBlob&&declEvPdfBlob); return count;
   }
 
   async function handleDeclFromFile(file,plataforma){
@@ -1505,6 +1524,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('declEvUseRowsBtn').onclick=()=>handleDeclFromRows('EV');
   document.getElementById('declBaixarAzBtn').onclick=()=>{if(!declAzPdfBlob)return;saveAs(declAzPdfBlob,'Declaracoes_Amazon_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.pdf');};
   document.getElementById('declBaixarEvBtn').onclick=()=>{if(!declEvPdfBlob)return;saveAs(declEvPdfBlob,'Declaracoes_EV_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.pdf');};
+  document.getElementById('declBaixarUnificadoBtn').onclick=async()=>{try{const blob=await mergePdfBlobsInOrder(declAzPdfBlob,declEvPdfBlob);saveAs(blob,'Declaracoes_Amazon_Estante_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.pdf');}catch(err){toast('⚠ '+err.message,4000);}};
 
   // ══════════════════════════════════════════════════════
   //  ETIQUETAS DE ENVIO
@@ -1710,7 +1730,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if(platform==='AZ') etiqAzPdfBlob=blob; else etiqEvPdfBlob=blob;
     const viewer=document.getElementById(viewerId),wrap=document.getElementById(wrapId),empty=wrap.querySelector('.decl-empty');
     if(empty)empty.style.display='none'; viewer.src=url; viewer.style.display='block';
-    document.getElementById(dlBtnId).style.display=''; return recs.length;
+    document.getElementById(dlBtnId).style.display='';
+    document.getElementById('etiqBaixarUnificadoBtn').disabled=!(etiqAzPdfBlob&&etiqEvPdfBlob); return recs.length;
   }
 
   async function etiqLoadFile(file, platform) {
@@ -1778,6 +1799,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('etiqEvUseRowsBtn').onclick=()=>etiqHandleFromRows('EV');
   document.getElementById('etiqBaixarAzBtn').onclick=()=>{if(!etiqAzPdfBlob)return;saveAs(etiqAzPdfBlob,'Etiquetas_Amazon_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.pdf');};
   document.getElementById('etiqBaixarEvBtn').onclick=()=>{if(!etiqEvPdfBlob)return;saveAs(etiqEvPdfBlob,'Etiquetas_EV_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.pdf');};
+  document.getElementById('etiqBaixarUnificadoBtn').onclick=async()=>{try{const blob=await mergePdfBlobsInOrder(etiqAzPdfBlob,etiqEvPdfBlob);saveAs(blob,'Etiquetas_Amazon_Estante_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.pdf');}catch(err){toast('⚠ '+err.message,4000);}};
 
 
   // ══════════════════════════════════════════════════════

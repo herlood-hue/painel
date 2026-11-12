@@ -300,6 +300,11 @@ tr:hover .del-btn{opacity:.7}
 .decl-status{font-size:.67rem;color:var(--text3);padding:.2rem .5rem;background:var(--bg3);border-radius:5px;border:1px solid var(--border);overflow:hidden;text-overflow:ellipsis}
 .decl-status.ok{color:var(--green);border-color:var(--green2);background:rgba(52,199,138,.06)}
 .decl-status.err{color:var(--red);border-color:var(--red2);background:rgba(240,92,92,.06)}
+ .decl-unified-toolbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap;padding:.65rem 1rem;background:var(--bg2);border-bottom:1px solid var(--border)}
+ .decl-unified-title{font-size:.72rem;font-weight:700;color:var(--text2);letter-spacing:.03em}
+ .decl-unified-actions{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;flex-wrap:wrap}
+ .decl-unified-actions .action-btn{white-space:nowrap}
+ @media(max-width:700px){.decl-unified-toolbar{align-items:flex-start}.decl-unified-actions{width:100%;justify-content:flex-start}}
 .decl-pdf-area{flex:1;width:100%;display:flex;flex-direction:row;overflow:hidden;min-height:0}
 .decl-pdf-divider{width:1px;flex-shrink:0;background:var(--border)}
 .decl-pdf-col{flex:1;min-width:0;overflow:hidden;position:relative;background:#525659;min-height:0}
@@ -481,6 +486,13 @@ tr:hover .del-btn{opacity:.7}
 
 <!-- ════ ABA DECLARAÇÕES ════ -->
   <div class="tab-panel" id="tab-declaracoes">
+    <div class="decl-unified-toolbar">
+      <span class="decl-unified-title">AÇÕES UNIFICADAS</span>
+      <div class="decl-unified-actions">
+        <button class="action-btn btn-accent" id="etiqImprimirUnificadoBtn" disabled>🖨 Imprimir etiquetas (Amazon + Estante)</button>
+        <button class="action-btn btn-accent" id="declBaixarUnificadoBtn" disabled>⬇ Baixar declarações (Amazon + Estante)</button>
+      </div>
+    </div>
     <div class="decl-controls-bar">
       <div class="decl-ctrl-col">
         <div class="decl-ctrl-title" style="color:var(--az)">🔵 Amazon</div>
@@ -515,9 +527,6 @@ tr:hover .del-btn{opacity:.7}
         </div>
         <span class="decl-status" id="declEvInfo">Selecione a planilha ou use os pedidos carregados.</span>
       </div>
-    </div>
-    <div style="display:flex;justify-content:flex-end;padding:.45rem 1rem;border-bottom:1px solid var(--border);">
-      <button class="action-btn btn-accent" id="declBaixarUnificadoBtn" disabled>⬇ Baixar declarações unificadas (Amazon + Estante)</button>
     </div>
     <div class="decl-pdf-area">
       <div class="decl-pdf-col" id="declAzWrap">
@@ -575,7 +584,6 @@ tr:hover .del-btn{opacity:.7}
     </div>
     <div style="display:flex;justify-content:flex-end;padding:.45rem 1rem;border-bottom:1px solid var(--border);">
       <button class="action-btn btn-accent" id="etiqBaixarUnificadoBtn" disabled>⬇ Baixar etiquetas unificadas (Amazon + Estante)</button>
-      <button class="action-btn btn-accent" id="etiqImprimirUnificadoBtn" disabled>🖨 Imprimir etiquetas unificadas</button>
     </div>
     <div class="decl-pdf-area">
       <div class="decl-pdf-col" id="etiqWrapAz">

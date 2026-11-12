@@ -489,6 +489,7 @@ tr:hover .del-btn{opacity:.7}
     <div class="decl-unified-toolbar">
       <span class="decl-unified-title">AÇÕES UNIFICADAS</span>
       <div class="decl-unified-actions">
+        <button class="action-btn btn-accent" id="declImprimirUnificadoBtn" disabled>🖨 Imprimir declarações (Amazon + Estante)</button>
         <button class="action-btn btn-accent" id="declBaixarUnificadoBtn" disabled>⬇ Baixar declarações (Amazon + Estante)</button>
       </div>
     </div>
@@ -1538,7 +1539,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if(plataforma==='AZ')declAzPdfBlob=blob; else declEvPdfBlob=blob;
     const viewer=document.getElementById(viewerId),wrap=document.getElementById(wrapId),empty=wrap.querySelector('.decl-empty');
     if(empty)empty.style.display='none'; viewer.src=url; viewer.style.display='block'; document.getElementById(dlBtnId).style.display='';
-    document.getElementById('declBaixarUnificadoBtn').disabled=!(declAzPdfBlob&&declEvPdfBlob); return count;
+    const declReady=!!(declAzPdfBlob&&declEvPdfBlob);
+    document.getElementById('declBaixarUnificadoBtn').disabled=!declReady;
+    document.getElementById('declImprimirUnificadoBtn').disabled=!declReady; return count;
   }
 
   async function handleDeclFromFile(file,plataforma){
@@ -1561,6 +1564,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('declBaixarAzBtn').onclick=()=>{if(!declAzPdfBlob)return;saveAs(declAzPdfBlob,'Declaracoes_Amazon_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.pdf');};
   document.getElementById('declBaixarEvBtn').onclick=()=>{if(!declEvPdfBlob)return;saveAs(declEvPdfBlob,'Declaracoes_EV_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.pdf');};
   document.getElementById('declBaixarUnificadoBtn').onclick=async()=>{try{const blob=await mergePdfBlobsInOrder(declAzPdfBlob,declEvPdfBlob);saveAs(blob,'Declaracoes_Amazon_Estante_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.pdf');}catch(err){toast('⚠ '+err.message,4000);}};
+  document.getElementById('declImprimirUnificadoBtn').onclick=async()=>{try{const blob=await mergePdfBlobsInOrder(declAzPdfBlob,declEvPdfBlob);await printPdfBlob(blob);}catch(err){toast('⚠ '+err.message,5000);}};
 
   // ══════════════════════════════════════════════════════
   //  ETIQUETAS DE ENVIO

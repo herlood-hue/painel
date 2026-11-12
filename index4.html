@@ -215,6 +215,11 @@ tr:hover .del-btn{opacity:.7}
 /* ── RESTORE BANNER ── */
 .restore-banner{display:none;align-items:center;gap:.6rem;padding:.45rem 1.25rem;background:rgba(240,180,41,.09);border-bottom:1px solid rgba(240,180,41,.25);font-size:.72rem;color:var(--yellow);flex-shrink:0;flex-wrap:wrap}
 .restore-banner span{flex:1}
+ .backup-toolbar{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;padding:.35rem 1rem;background:var(--bg2);border-bottom:1px solid var(--border);font-size:.68rem;color:var(--text3)}
+ .backup-toolbar .backup-status{flex:1;min-width:180px}
+ .backup-toolbar button,.backup-toolbar label{font:inherit;font-weight:700;padding:.25rem .55rem;border:1px solid var(--border2);border-radius:5px;background:var(--bg3);color:var(--text2);cursor:pointer}
+ .backup-toolbar button:hover,.backup-toolbar label:hover{border-color:var(--accent);color:var(--text)}
+ .backup-toolbar .backup-status.warn{color:var(--red)}
 .restore-btn{padding:.24rem .6rem;font-size:.68rem;font-weight:700;font-family:var(--font);border:none;border-radius:5px;cursor:pointer}
 .restore-btn.yes{background:var(--yellow);color:#1a0e00}
 .restore-btn.yes:hover{background:var(--yellow2)}
@@ -416,6 +421,12 @@ tr:hover .del-btn{opacity:.7}
 
 <div class="main">
 
+  <div class="backup-toolbar">
+    <span class="backup-status" id="backupStatus">💾 Salvamento automático ativo</span>
+    <button type="button" id="backupDownloadBtn">⬇ Baixar backup</button>
+    <label for="backupImportInput">↥ Restaurar backup</label>
+    <input type="file" id="backupImportInput" accept=".json,application/json" style="display:none">
+  </div>
   <div class="restore-banner" id="restoreBanner">
     <span id="restoreMsg">💾 Sessão anterior encontrada</span>
     <button class="restore-btn yes" onclick="restoreAutoSave()">Restaurar</button>
@@ -724,10 +735,42 @@ document.addEventListener('DOMContentLoaded', () => {
     return fallback;
   }
 
-  // ── AUTO-SAVE localStorage ──
+  // ── AUTO-SAVE localStorage + status visível + backup manual ──
   const AUTOSAVE_KEY = 'proc_autosave_v13';
   const AUTOSAVE_TTL_MS = 48 * 3600000; // 48h — dados pessoais de clientes não ficam guardados indefinidamente (LGPD)
-  function autoSave() { try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ rows: allRows, savedAt: Date.now() })); } catch(e) {} }
+  function setBackupStatus(message,isWarn=false){const el=document.getElementById('backupStatus');if(!el)return;el.textContent=message;el.classList.toggle('warn',!!isWarn);}
+  function autoSave() {
+    try {
+      const snapshot={version:1,rows:allRows,savedAt:Date.now()};
+      const serialized=JSON.stringify(snapshot);
+      localStorage.setItem(AUTOSAVE_KEY,serialized);
+      const stamp=new Date(snapshot.savedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      setBackupStatus('✓ Salvamento automático concluído às '+stamp+' ('+allRows.length+' pedidos)');
+      return true;
+    } catch(e) {
+      console.error('Falha no salvamento automático:',e);
+      setBackupStatus('⚠ Não foi possível salvar automaticamente. Baixe um backup agora.',true);
+      return false;
+    }
+  }
+  function downloadBackup(){
+    const snapshot={app:'Sebo Paraibuna — Processador',version:1,exportedAt:new Date().toISOString(),rows:allRows};
+    const blob=new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'});
+    saveAs(blob,'Backup_Pedidos_'+new Date().toLocaleDateString('pt-BR').replace(/\\//g,'-')+'.json');
+    setBackupStatus('✓ Backup baixado com '+allRows.length+' pedidos. Guarde o arquivo em local seguro.');
+  }
+  async function importBackup(file){
+    try{
+      const data=JSON.parse(await file.text());
+      if(!data||!Array.isArray(data.rows))throw new Error('Arquivo não reconhecido como backup válido.');
+      if(!confirm('Restaurar '+data.rows.length+' pedidos? Os pedidos atualmente carregados serão substituídos.'))return;
+      allRows=data.rows;showDupPanel(detectDuplicates(allRows));renderAll();autoSave();
+      document.getElementById('restoreBanner').style.display='none';
+      toast('✓ Backup restaurado: '+allRows.length+' pedidos');
+    }catch(err){toast('⚠ Erro ao restaurar backup: '+err.message,5000);}
+  }
+  document.getElementById('backupDownloadBtn').addEventListener('click',downloadBackup);
+  document.getElementById('backupImportInput').addEventListener('change',e=>{const file=e.target.files[0];if(file)importBackup(file);e.target.value='';});
   function autoLoad() {
     try {
       const raw = localStorage.getItem(AUTOSAVE_KEY); if (!raw) return;

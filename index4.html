@@ -1976,7 +1976,10 @@ document.addEventListener('DOMContentLoaded', () => {
           groups: groups.map(g => ({
             id: g.id,
             qtd: g.qtd,
-            itens: g.itens.map(it => ({ nome: it.nome, loc: it.loc || '', qty: it.qty || 1 }))
+            itens: g.itens.map(it => ({
+              nome: it.nome, loc: it.loc || '', qty: it.qty || 1,
+              imageUrl: String(it.imageUrl || it.thumbnail || it.picture || '').trim() || null
+            }))
           }))
         });
       });

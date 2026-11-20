@@ -2133,12 +2133,13 @@ document.addEventListener('DOMContentLoaded', () => {
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><button type="button" id="apiOrdersRefresh" class="upload-btn">Atualizar consulta</button><button type="button" id="apiOrdersLogin" class="upload-btn">Entrar no Integrador</button><label style="margin-left:auto;font-size:.8rem"><input type="checkbox" id="apiOrdersSelectAll"> Selecionar todos</label></div>
       <div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:.8rem"><thead><tr style="text-align:left;opacity:.7"><th style="padding:8px">✓</th><th>Canal</th><th>Pedido</th><th>Status</th><th>Envio</th><th>Data</th><th>Total</th><th>Itens</th></tr></thead><tbody id="apiOrdersBody"><tr><td colspan="8" style="padding:20px;text-align:center">Nenhuma consulta realizada.</td></tr></tbody></table></div>
       <footer style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px"><span id="apiOrdersSelected" style="font-size:.82rem">0 selecionados</span><button type="button" id="apiOrdersImport" class="upload-btn" disabled style="opacity:.5;cursor:not-allowed">Importar selecionados</button></footer>
-      <p style="font-size:.75rem;opacity:.7;margin:10px 0 0">Importação ficará disponível após a API fornecer os detalhes por item (produto, SKU, quantidade e valores). Nenhum pedido será gravado nesta prévia.</p>
+      <p style="font-size:.75rem;opacity:.7;margin:10px 0 0">A importação adiciona os pedidos somente ao processador local. Comissão e frete não informados pela API ficam em branco/zero; nenhuma alteração é enviada aos marketplaces.</p>
     </section>`;
     document.body.appendChild(el);
     el.querySelector('#apiOrdersClose').onclick=()=>el.style.display='none';
     el.querySelector('#apiOrdersRefresh').onclick=apiFetchOrders;
     el.querySelector('#apiOrdersLogin').onclick=apiOpenLogin;
+    el.querySelector('#apiOrdersImport').onclick=apiImportSelected;
     el.querySelector('#apiOrdersSelectAll').onchange=e=>{el.querySelectorAll('.api-order-check').forEach(c=>c.checked=e.target.checked);apiUpdateSelected();};
     el.querySelector('#apiOrdersBody').addEventListener('change',e=>{if(e.target.classList.contains('api-order-check'))apiUpdateSelected();});
   }
@@ -2146,8 +2147,55 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal=document.getElementById('apiOrdersModal');if(!modal)return;
     const n=modal.querySelectorAll('.api-order-check:checked').length;
     modal.querySelector('#apiOrdersSelected').textContent=n+' selecionado(s)';
+    const btn=modal.querySelector('#apiOrdersImport');btn.disabled=n===0;btn.style.opacity=n===0?'.5':'1';btn.style.cursor=n===0?'not-allowed':'pointer';
     const all=modal.querySelectorAll('.api-order-check').length;
     modal.querySelector('#apiOrdersSelectAll').checked=all>0&&n===all;
+  }
+  function apiImportSelected(){
+    const modal=document.getElementById('apiOrdersModal');if(!modal)return;
+    const indexes=[...modal.querySelectorAll('.api-order-check:checked')].map(c=>Number(c.dataset.index));
+    const selected=indexes.map(i=>apiPreviewOrders[i]).filter(Boolean);
+    if(!selected.length){toast('Selecione ao menos um pedido.');return;}
+    const existing=new Set(allRows.map(r=>String(r.site)+'|'+String(r.id).replace(/^#/,'').toLowerCase()));
+    const prepared=[],duplicates=[];
+    selected.forEach(o=>{
+      const site=String(o.marketplaceCode||'').toUpperCase();
+      if(!['SH','ML','NS'].includes(site))return;
+      const externalId=String(o.externalId??'').trim();
+      if(!externalId)return;
+      const idKey=site+'|'+externalId.replace(/^#/,'').toLowerCase();
+      if(existing.has(idKey)){duplicates.push(site+' #'+externalId);return;}
+      const items=Array.isArray(o.items)?o.items:[];
+      if(!items.length||items.some(it=>!String(it.name||'').trim()||!(Number(it.quantity)>0))){
+        duplicates.push(site+' #'+externalId+' (itens incompletos)');return;
+      }
+      const names=[],skus=[];let productTotal=0,hasPrices=true;
+      items.forEach(it=>{
+        const qty=Number(it.quantity)||1,name=String(it.name).trim(),sku=String(it.sku||'').trim();
+        names.push(qty>1?qty+' × '+name:name);
+        if(sku)skus.push(qty>1?'QTDE '+qty+' — '+getSku(sku):getSku(sku));
+        else skus.push(qty>1?'QTDE '+qty+' — sem SKU':'sem SKU');
+        const line=Number(it.lineTotal);
+        const unit=Number(it.unitPrice);
+        if(Number.isFinite(line))productTotal+=line;
+        else if(Number.isFinite(unit))productTotal+=unit*qty;
+        else hasPrices=false;
+      });
+      if(!hasPrices)productTotal=0;
+      prepared.push({site,id:site==='ML'?'#'+externalId:externalId,prod:productTotal,frete:0,total:productTotal,nome:names.join('\\n'),status:'PAGO',cod:site,sku:skus.join('\\n'),comm:null,commPct:null,liq:null,_apiImported:true,_apiItems:items});
+      existing.add(idKey);
+    });
+    if(!prepared.length){modal.querySelector('#apiOrdersFeedback').textContent='Nenhum pedido novo e completo para importar. '+duplicates.join(' · ');return;}
+    const detail='Importar '+prepared.length+' pedido(s) para o processador local?'+
+      '\\n\\nOs pedidos duplicados ou incompletos serão ignorados.'+
+      '\\nFrete e comissão não são estimados; ficarão zerados/em branco.'+
+      '\\nEsta ação NÃO altera estoque nem envia atualizações aos marketplaces.'+
+      (duplicates.length?'\\n\\nIgnorados: '+duplicates.join(' · '):'');
+    if(!confirm(detail))return;
+    addRows(prepared);
+    modal.querySelector('#apiOrdersFeedback').textContent='Importação local concluída: '+prepared.length+' pedido(s) adicionados. '+duplicates.length+' ignorado(s).';
+    modal.querySelectorAll('.api-order-check:checked').forEach(c=>c.checked=false);
+    apiUpdateSelected();
   }
   async function apiFetchOrders(){
     apiEnsureModal();const modal=document.getElementById('apiOrdersModal');

@@ -1416,6 +1416,15 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
         itens = order.map(g=>({nome:g.count>1?g.count+' * "'+g.name+'"':g.name,loc:g.loc,qty:g.count,imageUrl:g.imageUrl||null}));
+        // Pedidos importados pela API: mantém a imagem do item original mesmo quando
+        // o registro não veio da planilha Shopee (_rawNames pode não existir).
+        // Associa por posição, pois _rawSkus e _apiItems são criados na mesma ordem.
+        if (Array.isArray(r._apiItems) && r._apiItems.length === r._rawSkus.length) {
+          itens.forEach((entry, index) => {
+            const apiImage = String(r._apiItems[index]?.imageUrl || '').trim();
+            if (apiImage && !entry.imageUrl) entry.imageUrl = apiImage;
+          });
+        }
         qtdTotal = order.reduce((s,g)=>s+g.count,0);  // total de unidades físicas
       } else {
         const nomes=r.nome.split('\n'); const skuLines=r.sku.split('\n').filter(s=>!s.startsWith('COM '));

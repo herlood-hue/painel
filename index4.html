@@ -2130,6 +2130,11 @@ document.addEventListener('DOMContentLoaded', () => {
     el.innerHTML=`<section style="background:var(--panel,#171923);color:var(--text,#fff);width:min(1180px,100%);max-height:92vh;overflow:auto;border:1px solid var(--border,#444);border-radius:14px;padding:20px;box-shadow:0 24px 80px rgba(0,0,0,.28)">
       <header style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><h2 style="margin:0;font-size:1.1rem">Pedidos pendentes — APIs</h2><div id="apiOrdersMeta" style="font-size:.78rem;opacity:.75;margin-top:4px">Prévia somente leitura</div></div><button id="apiOrdersClose" type="button" class="icon-btn">✕</button></header>
       <div id="apiOrdersFeedback" style="margin:14px 0;padding:10px;border-radius:8px;background:rgba(128,128,128,.12);font-size:.84rem">Carregue os pedidos para visualizar.</div>
+      <div id="apiDailySchedule" style="margin:10px 0;padding:12px;border:1px solid var(--border,#444);border-radius:10px;background:rgba(59,130,246,.07)">
+        <div style="font-weight:700;font-size:.86rem">Central diária híbrida</div>
+        <div style="font-size:.78rem;opacity:.8;margin-top:4px">Consultas automáticas às 08h, 11h e 13h (horário de Brasília). Você também pode antecipar uma consulta manualmente.</div>
+        <div id="apiDailyLastSync" style="font-size:.75rem;opacity:.75;margin-top:5px">Aguardando primeira consulta do dia.</div>
+      </div>
       <div id="apiOrdersSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;margin:10px 0"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><button type="button" id="apiOrdersRefresh" class="upload-btn">↻ Atualizar consulta</button><button type="button" id="apiOrdersLogin" class="upload-btn" style="display:none">Entrar no Integrador</button><label style="margin-left:auto;font-size:.8rem"><input type="checkbox" id="apiOrdersSelectAll"> Selecionar todos os elegíveis</label></div>
       <div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:.8rem"><thead><tr style="text-align:left;opacity:.7"><th style="padding:8px">✓</th><th>Canal</th><th>Pedido</th><th>Status</th><th>Envio</th><th>Data</th><th>Total</th><th>Itens</th><th>Conferência</th></tr></thead><tbody id="apiOrdersBody"><tr><td colspan="9" style="padding:20px;text-align:center">Nenhuma consulta realizada.</td></tr></tbody></table></div>
@@ -2209,23 +2214,34 @@ document.addEventListener('DOMContentLoaded', () => {
   async function apiFetchOrders(){
     apiEnsureModal();const modal=document.getElementById('apiOrdersModal');
     const feedback=modal.querySelector('#apiOrdersFeedback'),body=modal.querySelector('#apiOrdersBody');
-    feedback.textContent='Consultando Shopee, Mercado Livre e Nuvemshop…';body.innerHTML='<tr><td colspan="8" style="padding:20px;text-align:center">Carregando…</td></tr>';
+    feedback.textContent='Sincronizando Shopee, Mercado Livre e Nuvemshop…';body.innerHTML='<tr><td colspan="9" style="padding:20px;text-align:center">Consultando marketplaces e atualizando a central diária…</td></tr>';
     try{
-      const response=await fetch(API_PROXY+'/orders/preview.json',{method:'GET',credentials:'same-origin',cache:'no-store',headers:{'Accept':'application/json'}});
+      const runResponse=await fetch(API_PROXY+'/orders/daily-sync/run',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Accept':'application/json'}});
+      const runType=runResponse.headers.get('content-type')||'';
+      if(runResponse.redirected||!runType.includes('application/json')){
+        feedback.textContent='Sessão administrativa não encontrada. Entre no Integrador e atualize a consulta.';
+        body.innerHTML='<tr><td colspan="9" style="padding:20px;text-align:center">Autenticação necessária.</td></tr>';
+        modal.querySelector('#apiOrdersLogin').style.display='inline-flex';return;
+      }
+      if(!runResponse.ok)throw new Error('HTTP '+runResponse.status);
+      const run=await runResponse.json();
+      if(run.busy){feedback.textContent='Já existe uma consulta em andamento. Atualize a tela em instantes.';return;}
+      const response=await fetch(API_PROXY+'/orders/daily-sync.json',{method:'GET',credentials:'same-origin',cache:'no-store',headers:{'Accept':'application/json'}});
       const type=response.headers.get('content-type')||'';
       if(response.redirected||!type.includes('application/json')){
-        feedback.textContent='Sessão administrativa não encontrada. Clique em “Entrar no Integrador”, faça login e depois atualize a consulta.';
-        body.innerHTML='<tr><td colspan="8" style="padding:20px;text-align:center">Autenticação necessária.</td></tr>';return;
+        feedback.textContent='Sessão administrativa não encontrada. Entre no Integrador e atualize a consulta.';
+        body.innerHTML='<tr><td colspan="9" style="padding:20px;text-align:center">Autenticação necessária.</td></tr>';return;
       }
       if(!response.ok)throw new Error('HTTP '+response.status);
       const data=await response.json();apiPreviewOrders=Array.isArray(data.orders)?data.orders:[];
-      const mkt=(data.marketplaces||[]).map(m=>m.marketplace+': '+m.count+(m.error?' (erro na consulta)':'')).join(' · ');
-      feedback.textContent=(data.success?'Consulta concluída. ':'Consulta parcial. ')+(mkt||'Nenhum marketplace retornou dados.');
+      const mkt=(run.marketplaces||[]).map(m=>m.marketplace+': '+m.count+(m.error?' (erro na consulta)':'')).join(' · ');
+      feedback.textContent=(run.success?'Consulta concluída. ':'Consulta parcial. ')+(mkt||'Nenhum marketplace retornou dados.');
       modal.querySelector('#apiOrdersLogin').style.display='none';
-      modal.querySelector('#apiOrdersMeta').textContent='Atualizado em '+new Date(data.fetchedAt||Date.now()).toLocaleString('pt-BR')+' · '+apiPreviewOrders.length+' pedido(s)';
-      if(data.readOnly!==true)throw new Error('A resposta não confirmou o modo somente leitura.');
+      const latest=data.lastSync?.finishedAt||apiPreviewOrders.map(o=>o.lastSeenAt).filter(Boolean).sort().pop();
+      modal.querySelector('#apiOrdersMeta').textContent='Central do dia '+(data.orderDate||'')+' · '+apiPreviewOrders.length+' pedido(s) acompanhados';
+      modal.querySelector('#apiDailyLastSync').textContent=latest?'Última consulta concluída: '+new Date(latest).toLocaleString('pt-BR')+' · '+(data.lastSync?.source==='scheduled'?'automática':'manual'):'Consulta concluída agora.';
       const existing=new Set(allRows.map(r=>String(r.site)+'|'+String(r.id).replace(/^#/,'').toLowerCase()));
-      const stats={eligible:0,duplicate:0,incomplete:0,byChannel:{}};
+      const stats={eligible:0,duplicate:0,incomplete:0,inactive:0,byChannel:{}};
       body.innerHTML=apiPreviewOrders.map((o,i)=>{
         const items=Array.isArray(o.items)?o.items:[];
         const itemHtml=items.map(it=>'<div style="padding:3px 0;border-bottom:1px solid var(--border,#444)">'+apiEsc(it.quantity)+' × '+apiEsc(it.name)+' <span style="opacity:.7">SKU: '+apiEsc(it.sku||'sem SKU')+'</span> <span style="opacity:.7">'+(it.unitPrice==null?'':apiEsc(it.unitPrice))+'</span></div>').join('');
@@ -2233,21 +2249,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const key=site+'|'+String(o.externalId??'').replace(/^#/,'').toLowerCase();
         const duplicate=existing.has(key);
         const complete=items.length>0&&items.every(it=>String(it.name||'').trim()&&Number(it.quantity)>0);
-        const state=duplicate?'Já importado':(!complete?'Dados incompletos':'Novo · pronto para importar');
-        const eligible=!duplicate&&complete;
+        const active=o.activeInQueue!==false;
+        const state=duplicate?'Já importado':(!active?'Saiu da fila de pendentes':(!complete?'Dados incompletos':'Novo · pronto para importar'));
+        const eligible=!duplicate&&active&&complete;
         if(eligible){stats.eligible++;stats.byChannel[site]=(stats.byChannel[site]||0)+1;}
-        else if(duplicate)stats.duplicate++;else stats.incomplete++;
-        return '<tr style="border-top:1px solid var(--border,#444);opacity:'+(eligible?'1':'.65')+'"><td style="padding:8px"><input class="api-order-check" type="checkbox" data-index="'+i+'" '+(eligible?'checked':'disabled')+'></td><td>'+apiEsc(site)+'</td><td style="font-family:monospace">'+apiEsc(o.externalId)+'</td><td>'+apiEsc(o.orderStatus)+'</td><td>'+apiEsc(o.shippingStatus)+'</td><td>'+apiEsc(o.createdAt)+'</td><td>'+apiEsc(o.total)+'</td><td><details><summary>'+apiEsc(o.itemCount)+' item(ns)</summary><div style="min-width:240px;padding:6px 0">'+(itemHtml||'Detalhes de itens indisponíveis')+'</div></details></td><td style="font-size:.75rem;color:'+(eligible?'#16a34a':'#d97706')+'">'+state+'</td></tr>';
-      }).join('')||'<tr><td colspan="9" style="padding:20px;text-align:center">Nenhum pedido retornado.</td></tr>';
+        else if(duplicate)stats.duplicate++;else if(!active)stats.inactive++;else stats.incomplete++;
+        const stateColor=eligible?'#16a34a':(!active?'#64748b':'#d97706');
+        const note=o.statusNote?'<div style="font-size:.7rem;opacity:.7">'+apiEsc(o.statusNote)+'</div>':'';
+        return '<tr style="border-top:1px solid var(--border,#444);opacity:'+(eligible?'1':'.65')+'"><td style="padding:8px"><input class="api-order-check" type="checkbox" data-index="'+i+'" '+(eligible?'checked':'disabled')+'></td><td>'+apiEsc(site)+'</td><td style="font-family:monospace">'+apiEsc(o.externalId)+'</td><td>'+apiEsc(o.orderStatus)+'</td><td>'+apiEsc(o.shippingStatus)+'</td><td>'+apiEsc(o.createdAt)+'</td><td>'+apiEsc(o.total)+'</td><td><details><summary>'+apiEsc(o.itemCount)+' item(ns)</summary><div style="min-width:240px;padding:6px 0">'+(itemHtml||'Detalhes de itens indisponíveis')+'</div></details></td><td style="font-size:.75rem;color:'+stateColor+'">'+state+note+'</td></tr>';
+      }).join('')||'<tr><td colspan="9" style="padding:20px;text-align:center">Nenhum pedido acompanhado hoje.</td></tr>';
       const summary=modal.querySelector('#apiOrdersSummary');
       summary.innerHTML=[
-        ['Novos',stats.eligible,'#16a34a'],
+        ['Novos elegíveis',stats.eligible,'#16a34a'],
         ['Já importados',stats.duplicate,'#64748b'],
+        ['Saíram da fila',stats.inactive,'#64748b'],
         ['Incompletos',stats.incomplete,'#d97706']
       ].map(x=>'<div style="padding:10px;border:1px solid var(--border,#444);border-radius:9px"><div style="font-size:.72rem;opacity:.75">'+x[0]+'</div><strong style="font-size:1.2rem;color:'+x[2]+'">'+x[1]+'</strong></div>').join('')+
       Object.entries(stats.byChannel).map(([k,v])=>'<div style="padding:10px;border:1px solid var(--border,#444);border-radius:9px"><div style="font-size:.72rem;opacity:.75">'+apiEsc(k)+'</div><strong style="font-size:1.2rem">'+v+'</strong><span style="font-size:.7rem;opacity:.7"> novo(s)</span></div>').join('');
       apiUpdateSelected();
-    }catch(err){feedback.textContent='Falha ao consultar API: '+String(err.message||err);body.innerHTML='<tr><td colspan="8" style="padding:20px;text-align:center">Não foi possível carregar os pedidos.</td></tr>';}
+    }catch(err){feedback.textContent='Falha ao sincronizar central diária: '+String(err.message||err);body.innerHTML='<tr><td colspan="9" style="padding:20px;text-align:center">Não foi possível atualizar os pedidos.</td></tr>';}
   }
   document.getElementById('apiOrdersOpen')?.addEventListener('click',()=>{apiEnsureModal();document.getElementById('apiOrdersModal').style.display='flex';apiFetchOrders();});
 

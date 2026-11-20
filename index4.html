@@ -2126,8 +2126,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function apiEnsureModal(){
     if(document.getElementById('apiOrdersModal'))return;
     const el=document.createElement('div');el.id='apiOrdersModal';
-    el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;display:none;align-items:center;justify-content:center;padding:16px';
-    el.innerHTML=`<section style="background:var(--panel,#171923);color:var(--text,#fff);width:min(1050px,100%);max-height:90vh;overflow:auto;border:1px solid var(--border,#444);border-radius:14px;padding:18px">
+    el.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:99999;display:none;align-items:center;justify-content:center;padding:16px';
+    el.innerHTML=`<section style="background:var(--panel,#171923);color:var(--text,#fff);width:min(1180px,100%);max-height:92vh;overflow:auto;border:1px solid var(--border,#444);border-radius:14px;padding:20px;box-shadow:0 24px 80px rgba(0,0,0,.28)">
       <header style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><h2 style="margin:0;font-size:1.1rem">Pedidos pendentes — APIs</h2><div id="apiOrdersMeta" style="font-size:.78rem;opacity:.75;margin-top:4px">Prévia somente leitura</div></div><button id="apiOrdersClose" type="button" class="icon-btn">✕</button></header>
       <div id="apiOrdersFeedback" style="margin:14px 0;padding:10px;border-radius:8px;background:rgba(128,128,128,.12);font-size:.84rem">Carregue os pedidos para visualizar.</div>
       <div id="apiOrdersSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;margin:10px 0"></div>
@@ -2138,6 +2138,8 @@ document.addEventListener('DOMContentLoaded', () => {
     </section>`;
     document.body.appendChild(el);
     el.querySelector('#apiOrdersClose').onclick=()=>el.style.display='none';
+    el.addEventListener('click',e=>{if(e.target===el)el.style.display='none';});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')el.style.display='none';});
     el.querySelector('#apiOrdersRefresh').onclick=apiFetchOrders;
     el.querySelector('#apiOrdersLogin').onclick=apiOpenLogin;
     el.querySelector('#apiOrdersImport').onclick=apiImportSelected;

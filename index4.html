@@ -2169,28 +2169,33 @@ document.addEventListener('DOMContentLoaded', () => {
       if(!items.length||items.some(it=>!String(it.name||'').trim()||!(Number(it.quantity)>0))){
         duplicates.push(site+' #'+externalId+' (itens incompletos)');return;
       }
-      const names=[],skus=[];let productTotal=0,hasPrices=true;
+      const names=[],rawSkus=[];let productTotal=0,hasPrices=true;
       items.forEach(it=>{
-        const qty=Number(it.quantity)||1,name=String(it.name).trim(),sku=String(it.sku||'').trim();
+        const qty=Number(it.quantity)||1,name=String(it.name).trim();
+        const sku=String(it.sku||'').trim(),variation=String(it.variation||'').trim();
         names.push(qty>1?qty+' × '+name:name);
-        if(sku)skus.push(qty>1?'QTDE '+qty+' — '+getSku(sku):getSku(sku));
-        else skus.push(qty>1?'QTDE '+qty+' — sem SKU':'sem SKU');
-        const line=Number(it.lineTotal);
-        const unit=Number(it.unitPrice);
-        if(Number.isFinite(line))productTotal+=line;
-        else if(Number.isFinite(unit))productTotal+=unit*qty;
+        // Preserva os dados originais para reaplicar a Base de SKUs antes ou depois da importação.
+        // Replica a regra da planilha Shopee: variação preenchida tem prioridade
+        // sobre o SKU e é exibida literalmente, sem passar pelo mapa da Base de SKUs.
+        const useVariation=!!variation;
+        const raw=useVariation?variation:(sku||'S/ SKU');
+        rawSkus.push({raw:raw,isVar:useVariation,q:qty,qty:qty});
+        const line=Number(it.lineTotal),unit=Number(it.unitPrice);
+        if(it.lineTotal!=null&&Number.isFinite(line))productTotal+=line;
+        else if(it.unitPrice!=null&&Number.isFinite(unit))productTotal+=unit*qty;
         else hasPrices=false;
       });
       if(!hasPrices)productTotal=0;
-      prepared.push({site,id:site==='ML'?'#'+externalId:externalId,prod:productTotal,frete:0,total:productTotal,nome:names.join('\\n'),status:'PAGO',cod:site,sku:skus.join('\\n'),comm:null,commPct:null,liq:null,_apiImported:true,_apiItems:items});
+      const skuDisplay=buildSkuDisp(rawSkus.map(item=>resolveRawItem(item)+' (x'+item.q+')'),rawSkus);
+      prepared.push({site:site,id:site==='ML'?'#'+externalId:externalId,prod:productTotal,frete:0,total:productTotal,nome:names.join('\n'),status:'PAGO',cod:site,sku:skuDisplay,comm:null,commPct:null,liq:null,_apiImported:true,_apiItems:items,_rawSkus:rawSkus});
       existing.add(idKey);
     });
     if(!prepared.length){modal.querySelector('#apiOrdersFeedback').textContent='Nenhum pedido novo e completo para importar. '+duplicates.join(' · ');return;}
     const detail='Importar '+prepared.length+' pedido(s) para o processador local?'+
-      '\\n\\nOs pedidos duplicados ou incompletos serão ignorados.'+
-      '\\nFrete e comissão não são estimados; ficarão zerados/em branco.'+
-      '\\nEsta ação NÃO altera estoque nem envia atualizações aos marketplaces.'+
-      (duplicates.length?'\\n\\nIgnorados: '+duplicates.join(' · '):'');
+      '\n\nOs pedidos duplicados ou incompletos serão ignorados.'+
+      '\n\nA Base de SKUs atual será aplicada; se carregar ou trocar a base depois, as localizações serão atualizadas automaticamente.'+
+      '\n\nEsta ação NÃO altera estoque nem envia atualizações aos marketplaces.'+
+      (duplicates.length?'\n\nIgnorados: '+duplicates.join(' · '):'');
     if(!confirm(detail))return;
     addRows(prepared);
     modal.querySelector('#apiOrdersFeedback').textContent='Importação local concluída: '+prepared.length+' pedido(s) adicionados. '+duplicates.length+' ignorado(s).';

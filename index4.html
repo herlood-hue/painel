@@ -1407,10 +1407,15 @@ document.addEventListener('DOMContentLoaded', () => {
           if (loc==='S/ SKU') loc='';
           const qty = qtyOf(skuLines[i], i);
           const key = name+'\x00'+loc;
-          if (seen.has(key)) seen.get(key).count += qty;
-          else { const entry={name,loc,count:qty}; seen.set(key,entry); order.push(entry); }
+          if (seen.has(key)) {
+            const entry=seen.get(key); entry.count += qty;
+            if (!entry.imageUrl && r._rawSkus[i].imageUrl) entry.imageUrl=r._rawSkus[i].imageUrl;
+          } else {
+            const entry={name,loc,count:qty,imageUrl:r._rawSkus[i].imageUrl||''};
+            seen.set(key,entry); order.push(entry);
+          }
         }
-        itens = order.map(g=>({nome:g.count>1?g.count+' * "'+g.name+'"':g.name,loc:g.loc,qty:g.count}));
+        itens = order.map(g=>({nome:g.count>1?g.count+' * "'+g.name+'"':g.name,loc:g.loc,qty:g.count,imageUrl:g.imageUrl||null}));
         qtdTotal = order.reduce((s,g)=>s+g.count,0);  // total de unidades físicas
       } else {
         const nomes=r.nome.split('\n'); const skuLines=r.sku.split('\n').filter(s=>!s.startsWith('COM '));
@@ -2191,7 +2196,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // sobre o SKU e é exibida literalmente, sem passar pelo mapa da Base de SKUs.
         const useVariation=!!variation;
         const raw=useVariation?variation:(sku||'S/ SKU');
-        rawSkus.push({raw:raw,isVar:useVariation,q:qty,qty:qty});
+        rawSkus.push({raw:raw,isVar:useVariation,q:qty,qty:qty,imageUrl:String(it.imageUrl||'').trim()||''});
         const line=Number(it.lineTotal),unit=Number(it.unitPrice);
         if(it.lineTotal!=null&&Number.isFinite(line))productTotal+=line;
         else if(it.unitPrice!=null&&Number.isFinite(unit))productTotal+=unit*qty;

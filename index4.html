@@ -352,6 +352,10 @@ tr:hover .del-btn{opacity:.7}
       <div class="universal-box-sub">Detecta automaticamente<br>Shopee · ML · Amazon · Estante</div>
     </div>
     <div class="universal-log" id="universalLog"></div>
+    <div style="margin-top:10px">
+      <button type="button" id="apiOrdersOpen" class="upload-btn" style="width:100%;cursor:pointer;background:var(--accent);color:#fff;border:0">🔄 Consultar pedidos das APIs</button>
+      <div id="apiOrdersStatus" class="sku-status" style="margin-top:6px">Shopee · Mercado Livre · Nuvemshop</div>
+    </div>
   </div>
 
   <div class="sidebar-section">
@@ -2110,6 +2114,62 @@ document.addEventListener('DOMContentLoaded', () => {
     saveAs(blob, 'Separacao_' + new Date().toLocaleDateString('pt-BR').replace(/\//g,'-') + '.html');
     toast('\u2713 Arquivo de separação gerado!');
   }
+
+
+  // ── PEDIDOS VIA API (somente prévia nesta etapa) ──
+  const API_PROXY='/integrador';
+  let apiPreviewOrders=[];
+  function apiEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function apiOpenLogin(){
+    window.open(API_PROXY+'/login?next='+encodeURIComponent('/integrador/orders/preview'),'_blank','noopener');
+  }
+  function apiEnsureModal(){
+    if(document.getElementById('apiOrdersModal'))return;
+    const el=document.createElement('div');el.id='apiOrdersModal';
+    el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;display:none;align-items:center;justify-content:center;padding:16px';
+    el.innerHTML=`<section style="background:var(--panel,#171923);color:var(--text,#fff);width:min(1050px,100%);max-height:90vh;overflow:auto;border:1px solid var(--border,#444);border-radius:14px;padding:18px">
+      <header style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><h2 style="margin:0;font-size:1.1rem">Pedidos pendentes — APIs</h2><div id="apiOrdersMeta" style="font-size:.78rem;opacity:.75;margin-top:4px">Prévia somente leitura</div></div><button id="apiOrdersClose" type="button" class="icon-btn">✕</button></header>
+      <div id="apiOrdersFeedback" style="margin:14px 0;padding:10px;border-radius:8px;background:rgba(128,128,128,.12);font-size:.84rem">Carregue os pedidos para visualizar.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><button type="button" id="apiOrdersRefresh" class="upload-btn">Atualizar consulta</button><button type="button" id="apiOrdersLogin" class="upload-btn">Entrar no Integrador</button><label style="margin-left:auto;font-size:.8rem"><input type="checkbox" id="apiOrdersSelectAll"> Selecionar todos</label></div>
+      <div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:.8rem"><thead><tr style="text-align:left;opacity:.7"><th style="padding:8px">✓</th><th>Canal</th><th>Pedido</th><th>Status</th><th>Envio</th><th>Data</th><th>Total</th><th>Itens</th></tr></thead><tbody id="apiOrdersBody"><tr><td colspan="8" style="padding:20px;text-align:center">Nenhuma consulta realizada.</td></tr></tbody></table></div>
+      <footer style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px"><span id="apiOrdersSelected" style="font-size:.82rem">0 selecionados</span><button type="button" id="apiOrdersImport" class="upload-btn" disabled style="opacity:.5;cursor:not-allowed">Importar selecionados</button></footer>
+      <p style="font-size:.75rem;opacity:.7;margin:10px 0 0">Importação ficará disponível após a API fornecer os detalhes por item (produto, SKU, quantidade e valores). Nenhum pedido será gravado nesta prévia.</p>
+    </section>`;
+    document.body.appendChild(el);
+    el.querySelector('#apiOrdersClose').onclick=()=>el.style.display='none';
+    el.querySelector('#apiOrdersRefresh').onclick=apiFetchOrders;
+    el.querySelector('#apiOrdersLogin').onclick=apiOpenLogin;
+    el.querySelector('#apiOrdersSelectAll').onchange=e=>{el.querySelectorAll('.api-order-check').forEach(c=>c.checked=e.target.checked);apiUpdateSelected();};
+    el.querySelector('#apiOrdersBody').addEventListener('change',e=>{if(e.target.classList.contains('api-order-check'))apiUpdateSelected();});
+  }
+  function apiUpdateSelected(){
+    const modal=document.getElementById('apiOrdersModal');if(!modal)return;
+    const n=modal.querySelectorAll('.api-order-check:checked').length;
+    modal.querySelector('#apiOrdersSelected').textContent=n+' selecionado(s)';
+    const all=modal.querySelectorAll('.api-order-check').length;
+    modal.querySelector('#apiOrdersSelectAll').checked=all>0&&n===all;
+  }
+  async function apiFetchOrders(){
+    apiEnsureModal();const modal=document.getElementById('apiOrdersModal');
+    const feedback=modal.querySelector('#apiOrdersFeedback'),body=modal.querySelector('#apiOrdersBody');
+    feedback.textContent='Consultando Shopee, Mercado Livre e Nuvemshop…';body.innerHTML='<tr><td colspan="8" style="padding:20px;text-align:center">Carregando…</td></tr>';
+    try{
+      const response=await fetch(API_PROXY+'/orders/preview.json',{method:'GET',credentials:'same-origin',cache:'no-store',headers:{'Accept':'application/json'}});
+      const type=response.headers.get('content-type')||'';
+      if(response.redirected||!type.includes('application/json')){
+        feedback.textContent='Sessão administrativa não encontrada. Clique em “Entrar no Integrador”, faça login e depois atualize a consulta.';
+        body.innerHTML='<tr><td colspan="8" style="padding:20px;text-align:center">Autenticação necessária.</td></tr>';return;
+      }
+      if(!response.ok)throw new Error('HTTP '+response.status);
+      const data=await response.json();apiPreviewOrders=Array.isArray(data.orders)?data.orders:[];
+      const mkt=(data.marketplaces||[]).map(m=>m.marketplace+': '+m.count+(m.error?' (erro na consulta)':'')).join(' · ');
+      feedback.textContent=(data.success?'Consulta concluída. ':'Consulta parcial. ')+(mkt||'Nenhum marketplace retornou dados.');
+      modal.querySelector('#apiOrdersMeta').textContent='Atualizado em '+new Date(data.fetchedAt||Date.now()).toLocaleString('pt-BR')+' · '+apiPreviewOrders.length+' pedido(s)';
+      body.innerHTML=apiPreviewOrders.map((o,i)=>'<tr style="border-top:1px solid var(--border,#444)"><td style="padding:8px"><input class="api-order-check" type="checkbox" data-index="'+i+'"></td><td>'+apiEsc(o.marketplaceCode)+'</td><td style="font-family:monospace">'+apiEsc(o.externalId)+'</td><td>'+apiEsc(o.orderStatus)+'</td><td>'+apiEsc(o.shippingStatus)+'</td><td>'+apiEsc(o.createdAt)+'</td><td>'+apiEsc(o.total)+'</td><td>'+apiEsc(o.itemCount)+'</td></tr>').join('')||'<tr><td colspan="8" style="padding:20px;text-align:center">Nenhum pedido retornado.</td></tr>';
+      apiUpdateSelected();
+    }catch(err){feedback.textContent='Falha ao consultar API: '+String(err.message||err);body.innerHTML='<tr><td colspan="8" style="padding:20px;text-align:center">Não foi possível carregar os pedidos.</td></tr>';}
+  }
+  document.getElementById('apiOrdersOpen')?.addEventListener('click',()=>{apiEnsureModal();document.getElementById('apiOrdersModal').style.display='flex';apiFetchOrders();});
 
   // ── AUTO-LOAD ao iniciar ──────────────────────────────────────────────────
   autoLoad();

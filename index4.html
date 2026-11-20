@@ -2175,9 +2175,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const sku=String(it.sku||'').trim(),variation=String(it.variation||'').trim();
         names.push(qty>1?qty+' × '+name:name);
         // Preserva os dados originais para reaplicar a Base de SKUs antes ou depois da importação.
-        const hasSku=!!sku&&!(variation&&sku===variation);
-        const raw=hasSku?sku:(variation||'sem SKU');
-        rawSkus.push({raw:raw,isVar:!hasSku&&!!variation,q:qty,qty:qty});
+        // Replica a regra da planilha Shopee: variação preenchida tem prioridade
+        // sobre o SKU e é exibida literalmente, sem passar pelo mapa da Base de SKUs.
+        const useVariation=!!variation;
+        const raw=useVariation?variation:(sku||'S/ SKU');
+        rawSkus.push({raw:raw,isVar:useVariation,q:qty,qty:qty});
         const line=Number(it.lineTotal),unit=Number(it.unitPrice);
         if(it.lineTotal!=null&&Number.isFinite(line))productTotal+=line;
         else if(it.unitPrice!=null&&Number.isFinite(unit))productTotal+=unit*qty;

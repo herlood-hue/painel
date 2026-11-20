@@ -1,4 +1,4 @@
 # Proxy autenticado para o backend do Integrador.
-# O navegador acessa o Netlify; o Netlify encaminha ao servidor mantendo a sessão
-# assinada pelo backend. Não habilitar CORS público nem expor tokens de marketplace.
-/integrador/*  https://livrosparaibuna.duckdns.org/:splat  200
+# Usa o hostname publicado no Cloudflare Tunnel, que encaminha para localhost:3000.
+# Não habilitar CORS público nem expor tokens de marketplace.
+/integrador/*  https://painel.seboparaibuna.com.br/:splat  200

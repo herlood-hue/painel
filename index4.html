@@ -215,6 +215,11 @@ tr:hover .del-btn{opacity:.7}
 /* ── RESTORE BANNER ── */
 .restore-banner{display:none;align-items:center;gap:.6rem;padding:.45rem 1.25rem;background:rgba(240,180,41,.09);border-bottom:1px solid rgba(240,180,41,.25);font-size:.72rem;color:var(--yellow);flex-shrink:0;flex-wrap:wrap}
 .restore-banner span{flex:1}
+ .backup-toolbar{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;padding:.35rem 1rem;background:var(--bg2);border-bottom:1px solid var(--border);font-size:.68rem;color:var(--text3)}
+ .backup-toolbar .backup-status{flex:1;min-width:180px}
+ .backup-toolbar button,.backup-toolbar label{font:inherit;font-weight:700;padding:.25rem .55rem;border:1px solid var(--border2);border-radius:5px;background:var(--bg3);color:var(--text2);cursor:pointer}
+ .backup-toolbar button:hover,.backup-toolbar label:hover{border-color:var(--accent);color:var(--text)}
+ .backup-toolbar .backup-status.warn{color:var(--red)}
 .restore-btn{padding:.24rem .6rem;font-size:.68rem;font-weight:700;font-family:var(--font);border:none;border-radius:5px;cursor:pointer}
 .restore-btn.yes{background:var(--yellow);color:#1a0e00}
 .restore-btn.yes:hover{background:var(--yellow2)}
@@ -347,6 +352,10 @@ tr:hover .del-btn{opacity:.7}
       <div class="universal-box-sub">Detecta automaticamente<br>Shopee · ML · Amazon · Estante</div>
     </div>
     <div class="universal-log" id="universalLog"></div>
+    <div style="margin-top:10px">
+      <button type="button" id="apiOrdersOpen" class="upload-btn" style="width:100%;cursor:pointer;background:var(--accent);color:#fff;border:0">🔄 Consultar pedidos das APIs</button>
+      <div id="apiOrdersStatus" class="sku-status" style="margin-top:6px">Shopee · Mercado Livre · Nuvemshop</div>
+    </div>
   </div>
 
   <div class="sidebar-section">
@@ -416,6 +425,12 @@ tr:hover .del-btn{opacity:.7}
 
 <div class="main">
 
+  <div class="backup-toolbar">
+    <span class="backup-status" id="backupStatus">💾 Salvamento automático ativo</span>
+    <button type="button" id="backupDownloadBtn">⬇ Baixar backup</button>
+    <label for="backupImportInput">↥ Restaurar backup</label>
+    <input type="file" id="backupImportInput" accept=".json,application/json" style="display:none">
+  </div>
   <div class="restore-banner" id="restoreBanner">
     <span id="restoreMsg">💾 Sessão anterior encontrada</span>
     <button class="restore-btn yes" onclick="restoreAutoSave()">Restaurar</button>
@@ -489,6 +504,7 @@ tr:hover .del-btn{opacity:.7}
     <div class="decl-unified-toolbar">
       <span class="decl-unified-title">AÇÕES UNIFICADAS</span>
       <div class="decl-unified-actions">
+        <button class="action-btn btn-accent" id="declImprimirUnificadoBtn" disabled>🖨 Imprimir declarações (Amazon + Estante)</button>
         <button class="action-btn btn-accent" id="declBaixarUnificadoBtn" disabled>⬇ Baixar declarações (Amazon + Estante)</button>
       </div>
     </div>
@@ -723,10 +739,42 @@ document.addEventListener('DOMContentLoaded', () => {
     return fallback;
   }
 
-  // ── AUTO-SAVE localStorage ──
+  // ── AUTO-SAVE localStorage + status visível + backup manual ──
   const AUTOSAVE_KEY = 'proc_autosave_v13';
   const AUTOSAVE_TTL_MS = 48 * 3600000; // 48h — dados pessoais de clientes não ficam guardados indefinidamente (LGPD)
-  function autoSave() { try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ rows: allRows, savedAt: Date.now() })); } catch(e) {} }
+  function setBackupStatus(message,isWarn=false){const el=document.getElementById('backupStatus');if(!el)return;el.textContent=message;el.classList.toggle('warn',!!isWarn);}
+  function autoSave() {
+    try {
+      const snapshot={version:1,rows:allRows,savedAt:Date.now()};
+      const serialized=JSON.stringify(snapshot);
+      localStorage.setItem(AUTOSAVE_KEY,serialized);
+      const stamp=new Date(snapshot.savedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      setBackupStatus('✓ Salvamento automático concluído às '+stamp+' ('+allRows.length+' pedidos)');
+      return true;
+    } catch(e) {
+      console.error('Falha no salvamento automático:',e);
+      setBackupStatus('⚠ Não foi possível salvar automaticamente. Baixe um backup agora.',true);
+      return false;
+    }
+  }
+  function downloadBackup(){
+    const snapshot={app:'Sebo Paraibuna — Processador',version:1,exportedAt:new Date().toISOString(),rows:allRows};
+    const blob=new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'});
+    saveAs(blob,'Backup_Pedidos_'+new Date().toLocaleDateString('pt-BR').replace(/\\//g,'-')+'.json');
+    setBackupStatus('✓ Backup baixado com '+allRows.length+' pedidos. Guarde o arquivo em local seguro.');
+  }
+  async function importBackup(file){
+    try{
+      const data=JSON.parse(await file.text());
+      if(!data||!Array.isArray(data.rows))throw new Error('Arquivo não reconhecido como backup válido.');
+      if(!confirm('Restaurar '+data.rows.length+' pedidos? Os pedidos atualmente carregados serão substituídos.'))return;
+      allRows=data.rows;showDupPanel(detectDuplicates(allRows));renderAll();autoSave();
+      document.getElementById('restoreBanner').style.display='none';
+      toast('✓ Backup restaurado: '+allRows.length+' pedidos');
+    }catch(err){toast('⚠ Erro ao restaurar backup: '+err.message,5000);}
+  }
+  document.getElementById('backupDownloadBtn').addEventListener('click',downloadBackup);
+  document.getElementById('backupImportInput').addEventListener('change',e=>{const file=e.target.files[0];if(file)importBackup(file);e.target.value='';});
   function autoLoad() {
     try {
       const raw = localStorage.getItem(AUTOSAVE_KEY); if (!raw) return;
@@ -1538,7 +1586,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if(plataforma==='AZ')declAzPdfBlob=blob; else declEvPdfBlob=blob;
     const viewer=document.getElementById(viewerId),wrap=document.getElementById(wrapId),empty=wrap.querySelector('.decl-empty');
     if(empty)empty.style.display='none'; viewer.src=url; viewer.style.display='block'; document.getElementById(dlBtnId).style.display='';
-    document.getElementById('declBaixarUnificadoBtn').disabled=!(declAzPdfBlob&&declEvPdfBlob); return count;
+    const declReady=!!(declAzPdfBlob&&declEvPdfBlob);
+    document.getElementById('declBaixarUnificadoBtn').disabled=!declReady;
+    document.getElementById('declImprimirUnificadoBtn').disabled=!declReady; return count;
   }
 
   async function handleDeclFromFile(file,plataforma){
@@ -1561,6 +1611,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('declBaixarAzBtn').onclick=()=>{if(!declAzPdfBlob)return;saveAs(declAzPdfBlob,'Declaracoes_Amazon_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.pdf');};
   document.getElementById('declBaixarEvBtn').onclick=()=>{if(!declEvPdfBlob)return;saveAs(declEvPdfBlob,'Declaracoes_EV_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.pdf');};
   document.getElementById('declBaixarUnificadoBtn').onclick=async()=>{try{const blob=await mergePdfBlobsInOrder(declAzPdfBlob,declEvPdfBlob);saveAs(blob,'Declaracoes_Amazon_Estante_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.pdf');}catch(err){toast('⚠ '+err.message,4000);}};
+  document.getElementById('declImprimirUnificadoBtn').onclick=async()=>{try{const blob=await mergePdfBlobsInOrder(declAzPdfBlob,declEvPdfBlob);await printPdfBlob(blob);}catch(err){toast('⚠ '+err.message,5000);}};
 
   // ══════════════════════════════════════════════════════
   //  ETIQUETAS DE ENVIO
@@ -2064,6 +2115,115 @@ document.addEventListener('DOMContentLoaded', () => {
     toast('\u2713 Arquivo de separação gerado!');
   }
 
+
+  // ── PEDIDOS VIA API (somente prévia nesta etapa) ──
+  const API_PROXY='/integrador';
+  let apiPreviewOrders=[];
+  function apiEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function apiOpenLogin(){
+    window.open(API_PROXY+'/login?next='+encodeURIComponent('/integrador/orders/preview'),'_blank','noopener');
+  }
+  function apiEnsureModal(){
+    if(document.getElementById('apiOrdersModal'))return;
+    const el=document.createElement('div');el.id='apiOrdersModal';
+    el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;display:none;align-items:center;justify-content:center;padding:16px';
+    el.innerHTML=`<section style="background:var(--panel,#171923);color:var(--text,#fff);width:min(1050px,100%);max-height:90vh;overflow:auto;border:1px solid var(--border,#444);border-radius:14px;padding:18px">
+      <header style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><h2 style="margin:0;font-size:1.1rem">Pedidos pendentes — APIs</h2><div id="apiOrdersMeta" style="font-size:.78rem;opacity:.75;margin-top:4px">Prévia somente leitura</div></div><button id="apiOrdersClose" type="button" class="icon-btn">✕</button></header>
+      <div id="apiOrdersFeedback" style="margin:14px 0;padding:10px;border-radius:8px;background:rgba(128,128,128,.12);font-size:.84rem">Carregue os pedidos para visualizar.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><button type="button" id="apiOrdersRefresh" class="upload-btn">Atualizar consulta</button><button type="button" id="apiOrdersLogin" class="upload-btn">Entrar no Integrador</button><label style="margin-left:auto;font-size:.8rem"><input type="checkbox" id="apiOrdersSelectAll"> Selecionar todos</label></div>
+      <div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:.8rem"><thead><tr style="text-align:left;opacity:.7"><th style="padding:8px">✓</th><th>Canal</th><th>Pedido</th><th>Status</th><th>Envio</th><th>Data</th><th>Total</th><th>Itens</th></tr></thead><tbody id="apiOrdersBody"><tr><td colspan="8" style="padding:20px;text-align:center">Nenhuma consulta realizada.</td></tr></tbody></table></div>
+      <footer style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px"><span id="apiOrdersSelected" style="font-size:.82rem">0 selecionados</span><button type="button" id="apiOrdersImport" class="upload-btn" disabled style="opacity:.5;cursor:not-allowed">Importar selecionados</button></footer>
+      <p style="font-size:.75rem;opacity:.7;margin:10px 0 0">A importação adiciona os pedidos somente ao processador local. Comissão e frete não informados pela API ficam em branco/zero; nenhuma alteração é enviada aos marketplaces.</p>
+    </section>`;
+    document.body.appendChild(el);
+    el.querySelector('#apiOrdersClose').onclick=()=>el.style.display='none';
+    el.querySelector('#apiOrdersRefresh').onclick=apiFetchOrders;
+    el.querySelector('#apiOrdersLogin').onclick=apiOpenLogin;
+    el.querySelector('#apiOrdersImport').onclick=apiImportSelected;
+    el.querySelector('#apiOrdersSelectAll').onchange=e=>{el.querySelectorAll('.api-order-check').forEach(c=>c.checked=e.target.checked);apiUpdateSelected();};
+    el.querySelector('#apiOrdersBody').addEventListener('change',e=>{if(e.target.classList.contains('api-order-check'))apiUpdateSelected();});
+  }
+  function apiUpdateSelected(){
+    const modal=document.getElementById('apiOrdersModal');if(!modal)return;
+    const n=modal.querySelectorAll('.api-order-check:checked').length;
+    modal.querySelector('#apiOrdersSelected').textContent=n+' selecionado(s)';
+    const btn=modal.querySelector('#apiOrdersImport');btn.disabled=n===0;btn.style.opacity=n===0?'.5':'1';btn.style.cursor=n===0?'not-allowed':'pointer';
+    const all=modal.querySelectorAll('.api-order-check').length;
+    modal.querySelector('#apiOrdersSelectAll').checked=all>0&&n===all;
+  }
+  function apiImportSelected(){
+    const modal=document.getElementById('apiOrdersModal');if(!modal)return;
+    const indexes=[...modal.querySelectorAll('.api-order-check:checked')].map(c=>Number(c.dataset.index));
+    const selected=indexes.map(i=>apiPreviewOrders[i]).filter(Boolean);
+    if(!selected.length){toast('Selecione ao menos um pedido.');return;}
+    const existing=new Set(allRows.map(r=>String(r.site)+'|'+String(r.id).replace(/^#/,'').toLowerCase()));
+    const prepared=[],duplicates=[];
+    selected.forEach(o=>{
+      const site=String(o.marketplaceCode||'').toUpperCase();
+      if(!['SH','ML','NS'].includes(site))return;
+      const externalId=String(o.externalId??'').trim();
+      if(!externalId)return;
+      const idKey=site+'|'+externalId.replace(/^#/,'').toLowerCase();
+      if(existing.has(idKey)){duplicates.push(site+' #'+externalId);return;}
+      const items=Array.isArray(o.items)?o.items:[];
+      if(!items.length||items.some(it=>!String(it.name||'').trim()||!(Number(it.quantity)>0))){
+        duplicates.push(site+' #'+externalId+' (itens incompletos)');return;
+      }
+      const names=[],skus=[];let productTotal=0,hasPrices=true;
+      items.forEach(it=>{
+        const qty=Number(it.quantity)||1,name=String(it.name).trim(),sku=String(it.sku||'').trim();
+        names.push(qty>1?qty+' × '+name:name);
+        if(sku)skus.push(qty>1?'QTDE '+qty+' — '+getSku(sku):getSku(sku));
+        else skus.push(qty>1?'QTDE '+qty+' — sem SKU':'sem SKU');
+        const line=Number(it.lineTotal);
+        const unit=Number(it.unitPrice);
+        if(Number.isFinite(line))productTotal+=line;
+        else if(Number.isFinite(unit))productTotal+=unit*qty;
+        else hasPrices=false;
+      });
+      if(!hasPrices)productTotal=0;
+      prepared.push({site,id:site==='ML'?'#'+externalId:externalId,prod:productTotal,frete:0,total:productTotal,nome:names.join('\\n'),status:'PAGO',cod:site,sku:skus.join('\\n'),comm:null,commPct:null,liq:null,_apiImported:true,_apiItems:items});
+      existing.add(idKey);
+    });
+    if(!prepared.length){modal.querySelector('#apiOrdersFeedback').textContent='Nenhum pedido novo e completo para importar. '+duplicates.join(' · ');return;}
+    const detail='Importar '+prepared.length+' pedido(s) para o processador local?'+
+      '\\n\\nOs pedidos duplicados ou incompletos serão ignorados.'+
+      '\\nFrete e comissão não são estimados; ficarão zerados/em branco.'+
+      '\\nEsta ação NÃO altera estoque nem envia atualizações aos marketplaces.'+
+      (duplicates.length?'\\n\\nIgnorados: '+duplicates.join(' · '):'');
+    if(!confirm(detail))return;
+    addRows(prepared);
+    modal.querySelector('#apiOrdersFeedback').textContent='Importação local concluída: '+prepared.length+' pedido(s) adicionados. '+duplicates.length+' ignorado(s).';
+    modal.querySelectorAll('.api-order-check:checked').forEach(c=>c.checked=false);
+    apiUpdateSelected();
+  }
+  async function apiFetchOrders(){
+    apiEnsureModal();const modal=document.getElementById('apiOrdersModal');
+    const feedback=modal.querySelector('#apiOrdersFeedback'),body=modal.querySelector('#apiOrdersBody');
+    feedback.textContent='Consultando Shopee, Mercado Livre e Nuvemshop…';body.innerHTML='<tr><td colspan="8" style="padding:20px;text-align:center">Carregando…</td></tr>';
+    try{
+      const response=await fetch(API_PROXY+'/orders/preview.json',{method:'GET',credentials:'same-origin',cache:'no-store',headers:{'Accept':'application/json'}});
+      const type=response.headers.get('content-type')||'';
+      if(response.redirected||!type.includes('application/json')){
+        feedback.textContent='Sessão administrativa não encontrada. Clique em “Entrar no Integrador”, faça login e depois atualize a consulta.';
+        body.innerHTML='<tr><td colspan="8" style="padding:20px;text-align:center">Autenticação necessária.</td></tr>';return;
+      }
+      if(!response.ok)throw new Error('HTTP '+response.status);
+      const data=await response.json();apiPreviewOrders=Array.isArray(data.orders)?data.orders:[];
+      const mkt=(data.marketplaces||[]).map(m=>m.marketplace+': '+m.count+(m.error?' (erro na consulta)':'')).join(' · ');
+      feedback.textContent=(data.success?'Consulta concluída. ':'Consulta parcial. ')+(mkt||'Nenhum marketplace retornou dados.');
+      modal.querySelector('#apiOrdersMeta').textContent='Atualizado em '+new Date(data.fetchedAt||Date.now()).toLocaleString('pt-BR')+' · '+apiPreviewOrders.length+' pedido(s)';
+      if(data.readOnly!==true)throw new Error('A resposta não confirmou o modo somente leitura.');
+      body.innerHTML=apiPreviewOrders.map((o,i)=>{
+        const items=Array.isArray(o.items)?o.items:[];
+        const itemHtml=items.map(it=>'<div style="padding:3px 0;border-bottom:1px solid var(--border,#444)">'+apiEsc(it.quantity)+' × '+apiEsc(it.name)+' <span style="opacity:.7">SKU: '+apiEsc(it.sku||'sem SKU')+'</span> <span style="opacity:.7">'+(it.unitPrice==null?'':apiEsc(it.unitPrice))+'</span></div>').join('');
+        return '<tr style="border-top:1px solid var(--border,#444)"><td style="padding:8px"><input class="api-order-check" type="checkbox" data-index="'+i+'"></td><td>'+apiEsc(o.marketplaceCode)+'</td><td style="font-family:monospace">'+apiEsc(o.externalId)+'</td><td>'+apiEsc(o.orderStatus)+'</td><td>'+apiEsc(o.shippingStatus)+'</td><td>'+apiEsc(o.createdAt)+'</td><td>'+apiEsc(o.total)+'</td><td><details><summary>'+apiEsc(o.itemCount)+' item(ns)</summary><div style="min-width:240px;padding:6px 0">'+(itemHtml||'Detalhes de itens indisponíveis')+'</div></details></td></tr>';
+      }).join('')||'<tr><td colspan="8" style="padding:20px;text-align:center">Nenhum pedido retornado.</td></tr>';
+      apiUpdateSelected();
+    }catch(err){feedback.textContent='Falha ao consultar API: '+String(err.message||err);body.innerHTML='<tr><td colspan="8" style="padding:20px;text-align:center">Não foi possível carregar os pedidos.</td></tr>';}
+  }
+  document.getElementById('apiOrdersOpen')?.addEventListener('click',()=>{apiEnsureModal();document.getElementById('apiOrdersModal').style.display='flex';apiFetchOrders();});
+
   // ── AUTO-LOAD ao iniciar ──────────────────────────────────────────────────
   autoLoad();
 
@@ -2071,3 +2231,5 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
+<!-- Deploy de validação da branch testes/index4-estabilidade; sem alteração funcional. -->

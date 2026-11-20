@@ -2131,7 +2131,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <header style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><h2 style="margin:0;font-size:1.1rem">Pedidos pendentes — APIs</h2><div id="apiOrdersMeta" style="font-size:.78rem;opacity:.75;margin-top:4px">Prévia somente leitura</div></div><button id="apiOrdersClose" type="button" class="icon-btn">✕</button></header>
       <div id="apiOrdersFeedback" style="margin:14px 0;padding:10px;border-radius:8px;background:rgba(128,128,128,.12);font-size:.84rem">Carregue os pedidos para visualizar.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><button type="button" id="apiOrdersRefresh" class="upload-btn">Atualizar consulta</button><button type="button" id="apiOrdersLogin" class="upload-btn">Entrar no Integrador</button><label style="margin-left:auto;font-size:.8rem"><input type="checkbox" id="apiOrdersSelectAll"> Selecionar todos</label></div>
-      <div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:.8rem"><thead><tr style="text-align:left;opacity:.7"><th style="padding:8px">✓</th><th>Canal</th><th>Pedido</th><th>Status</th><th>Envio</th><th>Data</th><th>Total</th><th>Itens</th></tr></thead><tbody id="apiOrdersBody"><tr><td colspan="8" style="padding:20px;text-align:center">Nenhuma consulta realizada.</td></tr></tbody></table></div>
+      <div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:.8rem"><thead><tr style="text-align:left;opacity:.7"><th style="padding:8px">✓</th><th>Canal</th><th>Pedido</th><th>Status</th><th>Envio</th><th>Data</th><th>Produtos</th><th>Líquido</th><th>Comissão</th><th>% Taxa</th><th>Itens</th></tr></thead><tbody id="apiOrdersBody"><tr><td colspan="11" style="padding:20px;text-align:center">Nenhuma consulta realizada.</td></tr></tbody></table></div>
       <footer style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px"><span id="apiOrdersSelected" style="font-size:.82rem">0 selecionados</span><button type="button" id="apiOrdersImport" class="upload-btn" disabled style="opacity:.5;cursor:not-allowed">Importar selecionados</button></footer>
       <p style="font-size:.75rem;opacity:.7;margin:10px 0 0">A importação adiciona os pedidos somente ao processador local. Comissão e frete não informados pela API ficam em branco/zero; nenhuma alteração é enviada aos marketplaces.</p>
     </section>`;
@@ -2182,7 +2182,11 @@ document.addEventListener('DOMContentLoaded', () => {
         else hasPrices=false;
       });
       if(!hasPrices)productTotal=0;
-      prepared.push({site,id:site==='ML'?'#'+externalId:externalId,prod:productTotal,frete:0,total:productTotal,nome:names.join('\\n'),status:'PAGO',cod:site,sku:skus.join('\\n'),comm:null,commPct:null,liq:null,_apiImported:true,_apiItems:items});
+      const importedProductTotal=Number.isFinite(Number(o.productSubtotal))?Number(o.productSubtotal):productTotal;
+      const importedCommission=o.commission==null?null:Number(o.commission);
+      const importedCommissionPct=o.commissionPct==null?null:Number(o.commissionPct);
+      const importedNet=o.net==null?null:Number(o.net);
+      prepared.push({site,id:site==='ML'?'#'+externalId:externalId,prod:importedProductTotal,frete:0,total:importedProductTotal,nome:names.join('\\n'),status:'PAGO',cod:site,sku:skus.join('\\n'),comm:importedCommission,commPct:importedCommissionPct,liq:importedNet,_apiImported:true,_apiItems:items});
       existing.add(idKey);
     });
     if(!prepared.length){modal.querySelector('#apiOrdersFeedback').textContent='Nenhum pedido novo e completo para importar. '+duplicates.join(' · ');return;}
@@ -2206,7 +2210,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const type=response.headers.get('content-type')||'';
       if(response.redirected||!type.includes('application/json')){
         feedback.textContent='Sessão administrativa não encontrada. Clique em “Entrar no Integrador”, faça login e depois atualize a consulta.';
-        body.innerHTML='<tr><td colspan="8" style="padding:20px;text-align:center">Autenticação necessária.</td></tr>';return;
+        body.innerHTML='<tr><td colspan="11" style="padding:20px;text-align:center">Autenticação necessária.</td></tr>';return;
       }
       if(!response.ok)throw new Error('HTTP '+response.status);
       const data=await response.json();apiPreviewOrders=Array.isArray(data.orders)?data.orders:[];
@@ -2217,10 +2221,10 @@ document.addEventListener('DOMContentLoaded', () => {
       body.innerHTML=apiPreviewOrders.map((o,i)=>{
         const items=Array.isArray(o.items)?o.items:[];
         const itemHtml=items.map(it=>'<div style="padding:3px 0;border-bottom:1px solid var(--border,#444)">'+apiEsc(it.quantity)+' × '+apiEsc(it.name)+' <span style="opacity:.7">SKU: '+apiEsc(it.sku||'sem SKU')+'</span> <span style="opacity:.7">'+(it.unitPrice==null?'':apiEsc(it.unitPrice))+'</span></div>').join('');
-        return '<tr style="border-top:1px solid var(--border,#444)"><td style="padding:8px"><input class="api-order-check" type="checkbox" data-index="'+i+'"></td><td>'+apiEsc(o.marketplaceCode)+'</td><td style="font-family:monospace">'+apiEsc(o.externalId)+'</td><td>'+apiEsc(o.orderStatus)+'</td><td>'+apiEsc(o.shippingStatus)+'</td><td>'+apiEsc(o.createdAt)+'</td><td>'+apiEsc(o.total)+'</td><td><details><summary>'+apiEsc(o.itemCount)+' item(ns)</summary><div style="min-width:240px;padding:6px 0">'+(itemHtml||'Detalhes de itens indisponíveis')+'</div></details></td></tr>';
-      }).join('')||'<tr><td colspan="8" style="padding:20px;text-align:center">Nenhum pedido retornado.</td></tr>';
+        return '<tr style="border-top:1px solid var(--border,#444)"><td style="padding:8px"><input class="api-order-check" type="checkbox" data-index="'+i+'"></td><td>'+apiEsc(o.marketplaceCode)+'</td><td style="font-family:monospace">'+apiEsc(o.externalId)+'</td><td>'+apiEsc(o.orderStatus)+'</td><td>'+apiEsc(o.shippingStatus)+'</td><td>'+apiEsc(o.createdAt)+'</td><td>'+apiEsc(o.productSubtotal==null?o.total:Number(o.productSubtotal).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}))+'</td><td>'+apiEsc(o.net==null?'—':Number(o.net).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}))+'</td><td>'+apiEsc(o.commission==null?'—':Number(o.commission).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}))+'</td><td>'+apiEsc(o.commissionPct==null?'—':Number(o.commissionPct).toFixed(1)+'%')+'</td><td><details><summary>'+apiEsc(o.itemCount)+' item(ns)</summary><div style="min-width:240px;padding:6px 0">'+(itemHtml||'Detalhes de itens indisponíveis')+'</div></details></td></tr>';
+      }).join('')||'<tr><td colspan="11" style="padding:20px;text-align:center">Nenhum pedido retornado.</td></tr>';
       apiUpdateSelected();
-    }catch(err){feedback.textContent='Falha ao consultar API: '+String(err.message||err);body.innerHTML='<tr><td colspan="8" style="padding:20px;text-align:center">Não foi possível carregar os pedidos.</td></tr>';}
+    }catch(err){feedback.textContent='Falha ao consultar API: '+String(err.message||err);body.innerHTML='<tr><td colspan="11" style="padding:20px;text-align:center">Não foi possível carregar os pedidos.</td></tr>';}
   }
   document.getElementById('apiOrdersOpen')?.addEventListener('click',()=>{apiEnsureModal();document.getElementById('apiOrdersModal').style.display='flex';apiFetchOrders();});
 

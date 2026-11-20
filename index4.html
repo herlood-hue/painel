@@ -2187,7 +2187,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       if(!hasPrices)productTotal=0;
       const skuDisplay=buildSkuDisp(rawSkus.map(item=>resolveRawItem(item)+' (x'+item.q+')'),rawSkus);
-      prepared.push({site:site,id:site==='ML'?'#'+externalId:externalId,prod:productTotal,frete:0,total:productTotal,nome:names.join('\n'),status:'PAGO',cod:site,sku:skuDisplay,comm:null,commPct:null,liq:null,_apiImported:true,_apiItems:items,_rawSkus:rawSkus});
+      prepared.push({site:site,id:site==='ML'?'#'+externalId:externalId,prod:productTotal,frete:0,total:productTotal,nome:names.join('\n'),status:'PAGO',cod:site,sku:skuDisplay,comm:site==='ML'&&Number.isFinite(Number(o.commission))?Number(o.commission):null,commPct:site==='ML'&&Number.isFinite(Number(o.commissionPct))?Number(o.commissionPct):null,liq:site==='ML'&&Number.isFinite(Number(o.net))?Number(o.net):null,_apiImported:true,_apiItems:items,_rawSkus:rawSkus});
       existing.add(idKey);
     });
     if(!prepared.length){modal.querySelector('#apiOrdersFeedback').textContent='Nenhum pedido novo e completo para importar. '+duplicates.join(' · ');return;}

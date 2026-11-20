@@ -353,7 +353,7 @@ tr:hover .del-btn{opacity:.7}
     </div>
     <div class="universal-log" id="universalLog"></div>
     <div style="margin-top:10px">
-      <button type="button" id="apiOrdersOpen" class="upload-btn" style="width:100%;cursor:pointer;background:var(--accent);color:#fff;border:0">🔄 Consultar pedidos das APIs</button>
+      <button type="button" id="apiOrdersOpen" class="upload-btn" style="width:100%;cursor:pointer;background:var(--accent);color:#fff;border:0">📥 Buscar e importar pedidos</button>
       <div id="apiOrdersStatus" class="sku-status" style="margin-top:6px">Shopee · Mercado Livre · Nuvemshop</div>
     </div>
   </div>
@@ -2161,8 +2161,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function apiEnsureModal(){
     if(document.getElementById('apiOrdersModal'))return;
     const el=document.createElement('div');el.id='apiOrdersModal';
-    el.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:99999;display:none;align-items:center;justify-content:center;padding:16px';
-    el.innerHTML=`<section style="background:var(--panel,#171923);color:var(--text,#fff);width:min(1180px,100%);max-height:92vh;overflow:auto;border:1px solid var(--border,#444);border-radius:14px;padding:20px;box-shadow:0 24px 80px rgba(0,0,0,.28)">
+    el.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.16);backdrop-filter:blur(1px);-webkit-backdrop-filter:blur(1px);z-index:99999;display:none;align-items:center;justify-content:center;padding:16px';
+    el.innerHTML=`<section style="background:#fff;color:#172033;width:min(520px,100%);max-height:80vh;overflow:auto;border:1px solid #dbe3ef;border-radius:16px;padding:20px;box-shadow:0 18px 55px rgba(15,23,42,.18)">
+      <style>#apiOrdersModal #apiDailySchedule,#apiOrdersModal #apiOrdersSummary,#apiOrdersModal table,#apiOrdersModal #apiOrdersSelectAll,#apiOrdersModal footer,#apiOrdersModal>section>div:nth-of-type(3){display:none!important}#apiOrdersModal #apiOrdersFeedback{background:#f1f6ff!important;color:#24436e!important;border:1px solid #d8e6fb;padding:14px!important}#apiOrdersModal #apiOrdersMeta{color:#64748b;opacity:1!important}#apiOrdersModal h2{color:#172033}#apiOrdersModal .icon-btn{background:#f1f5f9;color:#334155;border:1px solid #dbe3ef}</style>
       <header style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><h2 style="margin:0;font-size:1.1rem">Pedidos pendentes — APIs</h2><div id="apiOrdersMeta" style="font-size:.78rem;opacity:.75;margin-top:4px">Prévia somente leitura</div></div><button id="apiOrdersClose" type="button" class="icon-btn">✕</button></header>
       <div id="apiOrdersFeedback" style="margin:14px 0;padding:10px;border-radius:8px;background:rgba(128,128,128,.12);font-size:.84rem">Carregue os pedidos para visualizar.</div>
       <div id="apiDailySchedule" style="margin:10px 0;padding:12px;border:1px solid var(--border,#444);border-radius:10px;background:rgba(59,130,246,.07)">
@@ -2262,17 +2263,14 @@ document.addEventListener('DOMContentLoaded', () => {
       existing.add(idKey);
     });
     if(!prepared.length&&!enriched){modal.querySelector('#apiOrdersFeedback').textContent='Nenhum pedido novo ou imagem pendente para atualizar. '+duplicates.join(' · ');return;}
-    const detail='Adicionar '+prepared.length+' pedido(s) novo(s) e completar imagens de '+enriched+' pedido(s) Shopee já importado(s)?'+
-      '\n\nA atualização de imagens preserva os dados e as localizações já existentes.'+
-      '\n\nA Base de SKUs atual será aplicada aos pedidos novos.'+
-      '\n\nEsta ação NÃO altera estoque nem envia atualizações aos marketplaces.'+
-      (duplicates.length?'\n\nIgnorados: '+duplicates.join(' · '):'');
-    if(!confirm(detail))return;
+    // Importação automática: somente pedidos novos completos e registros existentes
+    // com imagens/dados financeiros faltantes chegam selecionados pela validação acima.
     if(prepared.length)allRows=allRows.concat(prepared);
-    if(prepared.length||enriched){showDupPanel(detectDuplicates(allRows));renderAll();autoSave();toast('✓ '+prepared.length+' novo(s) e '+enriched+' pedido(s) atualizado(s) com imagens/dados');}
+    if(prepared.length||enriched){showDupPanel(detectDuplicates(allRows));renderAll();autoSave();toast('✓ '+prepared.length+' novo(s) importado(s) · '+enriched+' atualizado(s)');}
     modal.querySelector('#apiOrdersFeedback').textContent='Concluído: '+prepared.length+' pedido(s) novo(s) adicionado(s), '+enriched+' pedido(s) existente(s) atualizado(s) com imagens e/ou dados financeiros. '+duplicates.length+' ignorado(s).';
     modal.querySelectorAll('.api-order-check:checked').forEach(c=>c.checked=false);
     apiUpdateSelected();
+    modal.style.display='none';
   }
   async function apiFetchOrders(){
     apiEnsureModal();const modal=document.getElementById('apiOrdersModal');
@@ -2340,6 +2338,14 @@ document.addEventListener('DOMContentLoaded', () => {
       ].map(x=>'<div style="padding:10px;border:1px solid var(--border,#444);border-radius:9px"><div style="font-size:.72rem;opacity:.75">'+x[0]+'</div><strong style="font-size:1.2rem;color:'+x[2]+'">'+x[1]+'</strong></div>').join('')+
       Object.entries(stats.byChannel).map(([k,v])=>'<div style="padding:10px;border:1px solid var(--border,#444);border-radius:9px"><div style="font-size:.72rem;opacity:.75">'+apiEsc(k)+'</div><strong style="font-size:1.2rem">'+v+'</strong><span style="font-size:.7rem;opacity:.7"> novo(s)</span></div>').join('');
       apiUpdateSelected();
+      const selectedCount=modal.querySelectorAll('.api-order-check:checked').length;
+      if(selectedCount){apiImportSelected();}
+      else{
+        const msg='Consulta concluída. Nenhum pedido novo ou atualização pendente para importar.';
+        feedback.textContent=msg;
+        toast(msg);
+        modal.style.display='none';
+      }
     }catch(err){feedback.textContent='Falha ao sincronizar central diária: '+String(err.message||err);body.innerHTML='<tr><td colspan="9" style="padding:20px;text-align:center">Não foi possível atualizar os pedidos.</td></tr>';}
   }
   document.getElementById('apiOrdersOpen')?.addEventListener('click',()=>{apiEnsureModal();document.getElementById('apiOrdersModal').style.display='flex';apiFetchOrders();});

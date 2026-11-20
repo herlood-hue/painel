@@ -1427,9 +1427,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         qtdTotal = order.reduce((s,g)=>s+g.count,0);  // total de unidades físicas
       } else {
-        const nomes=r.nome.split('\n'); const skuLines=r.sku.split('\n').filter(s=>!s.startsWith('COM '));
-        itens=skuLines.length>1?skuLines.map((sku,idx)=>({nome:nomes[idx]||nomes[0],loc:sku.replace(/\s*\(x\d+\)\s*$/,'').trim(),qty:1})):[{nome:nomes[0],loc:skuLines[0]||'',qty:1}];
-        qtdTotal = itens.length;
+        const nomes=r.nome.split('\n');
+        const skuLines=r.sku.split('\n').filter(s=>!s.startsWith('COM '));
+        const rawSkus=Array.isArray(r._rawSkus)?r._rawSkus:[];
+        const apiItems=Array.isArray(r._apiItems)?r._apiItems:[];
+        // API imports do not always have _rawNames. Still recover imageUrl from
+        // the aligned raw SKU/API item records instead of dropping it in fallback.
+        const count=Math.max(skuLines.length,rawSkus.length,apiItems.length,1);
+        itens=Array.from({length:count},(_,idx)=>{
+          const raw=rawSkus[idx]||{};
+          const api=apiItems[idx]||{};
+          const line=skuLines[idx]||skuLines[0]||'';
+          const qty=Number(raw.q||raw.qty||api.quantity||1)||1;
+          const imageUrl=String(raw.imageUrl||api.imageUrl||'').trim();
+          return {
+            nome:nomes[idx]||nomes[0]||api.name||'',
+            loc:String(line).replace(/\s*\(x\d+\)\s*$/,'').trim(),
+            qty,
+            imageUrl:imageUrl||null
+          };
+        });
+        qtdTotal=itens.reduce((sum,it)=>sum+(it.qty||1),0);
       }
       return{id:r.id,qtd:qtdTotal,itens};
     });

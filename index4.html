@@ -2165,7 +2165,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const mkt=(data.marketplaces||[]).map(m=>m.marketplace+': '+m.count+(m.error?' (erro na consulta)':'')).join(' · ');
       feedback.textContent=(data.success?'Consulta concluída. ':'Consulta parcial. ')+(mkt||'Nenhum marketplace retornou dados.');
       modal.querySelector('#apiOrdersMeta').textContent='Atualizado em '+new Date(data.fetchedAt||Date.now()).toLocaleString('pt-BR')+' · '+apiPreviewOrders.length+' pedido(s)';
-      body.innerHTML=apiPreviewOrders.map((o,i)=>'<tr style="border-top:1px solid var(--border,#444)"><td style="padding:8px"><input class="api-order-check" type="checkbox" data-index="'+i+'"></td><td>'+apiEsc(o.marketplaceCode)+'</td><td style="font-family:monospace">'+apiEsc(o.externalId)+'</td><td>'+apiEsc(o.orderStatus)+'</td><td>'+apiEsc(o.shippingStatus)+'</td><td>'+apiEsc(o.createdAt)+'</td><td>'+apiEsc(o.total)+'</td><td>'+apiEsc(o.itemCount)+'</td></tr>').join('')||'<tr><td colspan="8" style="padding:20px;text-align:center">Nenhum pedido retornado.</td></tr>';
+      if(data.readOnly!==true)throw new Error('A resposta não confirmou o modo somente leitura.');
+      body.innerHTML=apiPreviewOrders.map((o,i)=>{
+        const items=Array.isArray(o.items)?o.items:[];
+        const itemHtml=items.map(it=>'<div style="padding:3px 0;border-bottom:1px solid var(--border,#444)">'+apiEsc(it.quantity)+' × '+apiEsc(it.name)+' <span style="opacity:.7">SKU: '+apiEsc(it.sku||'sem SKU')+'</span> <span style="opacity:.7">'+(it.unitPrice==null?'':apiEsc(it.unitPrice))+'</span></div>').join('');
+        return '<tr style="border-top:1px solid var(--border,#444)"><td style="padding:8px"><input class="api-order-check" type="checkbox" data-index="'+i+'"></td><td>'+apiEsc(o.marketplaceCode)+'</td><td style="font-family:monospace">'+apiEsc(o.externalId)+'</td><td>'+apiEsc(o.orderStatus)+'</td><td>'+apiEsc(o.shippingStatus)+'</td><td>'+apiEsc(o.createdAt)+'</td><td>'+apiEsc(o.total)+'</td><td><details><summary>'+apiEsc(o.itemCount)+' item(ns)</summary><div style="min-width:240px;padding:6px 0">'+(itemHtml||'Detalhes de itens indisponíveis')+'</div></details></td></tr>';
+      }).join('')||'<tr><td colspan="8" style="padding:20px;text-align:center">Nenhum pedido retornado.</td></tr>';
       apiUpdateSelected();
     }catch(err){feedback.textContent='Falha ao consultar API: '+String(err.message||err);body.innerHTML='<tr><td colspan="8" style="padding:20px;text-align:center">Não foi possível carregar os pedidos.</td></tr>';}
   }

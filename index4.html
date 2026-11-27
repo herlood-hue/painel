@@ -849,6 +849,9 @@ document.addEventListener('DOMContentLoaded', () => {
       r.sku = r._rawSkuArr.length > 1 ? `COM ${r._rawSkuArr.length}\n${resolved.join('\n')}` : (r._rawSkuArr[0] ? getSku(r._rawSkuArr[0]) : '');
     } else if ((r.site==='ML'||r.site==='AZ') && r._rawSku) {
       r.sku = getSku(r._rawSku);
+    } else if ((r.site==='ML'||r.site==='NS') && r._rawSkus) {
+      const items = r._rawSkus.map(s=>resolveRawItem(s)+' (x'+(Number(s.q||s.qty)||1)+')');
+      r.sku = buildSkuDisp(items, r._rawSkus);
     } else if (r.site==='EV' && r._rawSkus) {
       const items = r._rawSkus.map(s=>getSku(s));
       r.sku = items.length>1 ? `COM ${items.length}\n${items.join('\n')}` : items[0];
@@ -2218,7 +2221,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if(existing.has(idKey)){
         const existingRow=allRows.find(r=>String(r.site)+'|'+String(r.id).replace(/^#/,'').toLowerCase()===idKey);
         let imagesAdded=0,financialsUpdated=false;
-        if(['SH','ML'].includes(site)&&existingRow&&Array.isArray(existingRow._rawSkus)&&existingRow._rawSkus.length===items.length){
+        if(['SH','ML','NS'].includes(site)&&existingRow&&Array.isArray(existingRow._rawSkus)&&existingRow._rawSkus.length===items.length){
           items.forEach((it,index)=>{
             const imageUrl=String(it.imageUrl||'').trim();
             if(imageUrl&&!String(existingRow._rawSkus[index].imageUrl||'').trim()){

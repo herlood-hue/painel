@@ -2260,7 +2260,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const apiCommission=o.commission!=null&&Number.isFinite(Number(o.commission))?Number(o.commission):null;
       const apiCommissionPct=o.commissionPct!=null&&Number.isFinite(Number(o.commissionPct))?Number(o.commissionPct):null;
       const apiNet=o.net!=null&&Number.isFinite(Number(o.net))?Number(o.net):null;
-      prepared.push({site:site,id:site==='ML'?'#'+externalId:externalId,prod:apiProductSubtotal,frete:0,total:apiProductSubtotal,nome:names.join('\\n'),status:'PAGO',cod:site,sku:skuDisplay,comm:apiCommission,commPct:apiCommissionPct,liq:apiNet,_apiImported:true,_apiItems:items,_rawSkus:rawSkus});
+      prepared.push({site:site,id:site==='ML'?'#'+externalId:externalId,prod:apiProductSubtotal,frete:0,total:apiProductSubtotal,nome:names.join('\n'),status:'PAGO',cod:site,sku:skuDisplay,comm:apiCommission,commPct:apiCommissionPct,liq:apiNet,_apiImported:true,_apiItems:items,_rawSkus:rawSkus});
       existing.add(idKey);
     });
     if(!prepared.length&&!enriched){modal.querySelector('#apiOrdersFeedback').textContent='Nenhum pedido novo ou imagem pendente para atualizar. '+duplicates.join(' · ');return;}

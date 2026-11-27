@@ -1441,10 +1441,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const count=Math.max(skuLines.length,rawSkus.length,apiItems.length,1);
         itens=Array.from({length:count},(_,idx)=>{
           const raw=rawSkus[idx]||{};
+          const rawSku=String(raw.raw||'').trim().toLowerCase();
           const api=apiItems[idx]||{};
+          // Nuvemshop: localiza a imagem pelo SKU antes de recorrer à posição,
+          // pois a ordem dos itens pode mudar entre a importação e a publicação.
+          const apiImageItem=rawSku
+            ? apiItems.find(a=>String(a.sku||'').trim().toLowerCase()===rawSku&&String(a.imageUrl||'').trim())
+            : null;
           const line=skuLines[idx]||skuLines[0]||'';
           const qty=Number(raw.q||raw.qty||api.quantity||1)||1;
-          const imageUrl=String(raw.imageUrl||api.imageUrl||'').trim();
+          const imageUrl=String(raw.imageUrl||apiImageItem?.imageUrl||api.imageUrl||'').trim();
           return {
             nome:nomes[idx]||nomes[0]||api.name||'',
             loc:String(line).replace(/\s*\(x\d+\)\s*$/,'').trim(),

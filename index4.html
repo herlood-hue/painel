@@ -1069,7 +1069,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateStats() {
     document.getElementById('stat-total').textContent=allRows.length;
     ['SH','ML','AZ','EV','NS'].forEach(s=>{
-      document.getElementById('stat-'+s.toLowerCase()).textContent=allRows.filter(r=>r.site===s).length;
+      const statEl=document.getElementById('stat-'+s.toLowerCase()); if(statEl) statEl.textContent=allRows.filter(r=>r.site===s).length;
       const n=allRows.filter(r=>r.site===s).length;
       const el=document.getElementById('count-'+s); if(el) el.textContent=n>0?`${n} pedido${n>1?'s':''} carregado${n>1?'s':''}`:'';
       const mktId={SH:'mkt-sh',ML:'mkt-ml',AZ:'mkt-az',EV:'mkt-ev'}[s];
@@ -2299,10 +2299,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const data=await response.json();apiPreviewOrders=Array.isArray(data.orders)?data.orders:[];
       const mkt=(run.marketplaces||[]).map(m=>m.marketplace+': '+m.count+(m.error?' (erro na consulta)':'')).join(' · ');
       feedback.textContent=(run.success?'Consulta concluída. ':'Consulta parcial. ')+(mkt||'Nenhum marketplace retornou dados.');
-      modal.querySelector('#apiOrdersLogin').style.display='none';
+      const loginButton=modal.querySelector('#apiOrdersLogin');if(loginButton)loginButton.style.display='none';
       const latest=data.lastSync?.finishedAt||apiPreviewOrders.map(o=>o.lastSeenAt).filter(Boolean).sort().pop();
-      modal.querySelector('#apiOrdersMeta').textContent='Central do dia '+(data.orderDate||'')+' · '+apiPreviewOrders.length+' pedido(s) acompanhados';
-      modal.querySelector('#apiDailyLastSync').textContent=latest?'Última consulta concluída: '+new Date(latest).toLocaleString('pt-BR')+' · '+(data.lastSync?.source==='scheduled'?'automática':'manual'):'Consulta concluída agora.';
+      const meta=modal.querySelector('#apiOrdersMeta');if(meta)meta.textContent='Central do dia '+(data.orderDate||'')+' · '+apiPreviewOrders.length+' pedido(s) acompanhados';
+      const lastSync=modal.querySelector('#apiDailyLastSync');if(lastSync)lastSync.textContent=latest?'Última consulta concluída: '+new Date(latest).toLocaleString('pt-BR')+' · '+(data.lastSync?.source==='scheduled'?'automática':'manual'):'Consulta concluída agora.';
       const existing=new Map(allRows.map(r=>[String(r.site)+'|'+String(r.id).replace(/^#/,'').toLowerCase(),r]));
       const stats={eligible:0,enrichable:0,duplicate:0,incomplete:0,inactive:0,byChannel:{}};
       body.innerHTML=apiPreviewOrders.map((o,i)=>{
@@ -2331,7 +2331,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return '<tr style="border-top:1px solid var(--border,#444);opacity:'+(eligible?'1':'.65')+'"><td style="padding:8px"><input class="api-order-check" type="checkbox" data-index="'+i+'" '+(eligible?'checked':'disabled')+'></td><td>'+apiEsc(site)+'</td><td style="font-family:monospace">'+apiEsc(o.externalId)+'</td><td>'+apiEsc(o.orderStatus)+'</td><td>'+apiEsc(o.shippingStatus)+'</td><td>'+apiEsc(o.createdAt)+'</td><td>'+apiEsc(o.total)+'</td><td><details><summary>'+apiEsc(o.itemCount)+' item(ns)</summary><div style="min-width:240px;padding:6px 0">'+(itemHtml||'Detalhes de itens indisponíveis')+'</div></details></td><td style="font-size:.75rem;color:'+stateColor+'">'+state+note+'</td></tr>';
       }).join('')||'<tr><td colspan="9" style="padding:20px;text-align:center">Nenhum pedido acompanhado hoje.</td></tr>';
       const summary=modal.querySelector('#apiOrdersSummary');
-      summary.innerHTML=[
+      if(summary) summary.innerHTML=[
         ['Novos elegíveis',stats.eligible,'#16a34a'],
         ['Dados a completar',stats.enrichable,'#2563eb'],
         ['Já importados',stats.duplicate,'#64748b'],

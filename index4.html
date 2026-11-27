@@ -1476,7 +1476,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function buildPickList() {
     const body=document.getElementById('pickBody'); body.innerHTML='';
     const total=allRows.length; document.getElementById('pickSubtitle').textContent=`${total} pedido${total!==1?'s':''} · ${new Date().toLocaleDateString('pt-BR')}`;
-    const sites=[{id:'SH',label:'Shopee',color:'var(--sh)'},{id:'ML',label:'Mercado Livre',color:'var(--ml)'},{id:'AZ',label:'Amazon',color:'var(--az)'},{id:'EV',label:'Estante Virtual',color:'var(--ev)'}];
+    const sites=[{id:'SH',label:'Shopee',color:'var(--sh)'},{id:'ML',label:'Mercado Livre',color:'var(--ml)'},{id:'AZ',label:'Amazon',color:'var(--az)'},{id:'EV',label:'Estante Virtual',color:'var(--ev)'},{id:'NS',label:'Nuvemshop',color:'var(--ns)'}];
     sites.forEach(site=>{
       const rows=allRows.filter(r=>r.site===site.id); if(!rows.length)return;
       const groups=extractPickGroups(rows); const totalItens=groups.reduce((s,g)=>s+g.qtd,0);

@@ -2301,7 +2301,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data=await response.json();apiPreviewOrders=Array.isArray(data.orders)?data.orders:[];
       const mkt=(run.marketplaces||[]).map(m=>m.marketplace+': '+m.count+(m.error?' (erro na consulta)':'')).join(' · ');
       feedback.textContent=(run.success?'Consulta concluída. ':'Consulta parcial. ')+(mkt||'Nenhum marketplace retornou dados.');
-      modal.querySelector('#apiOrdersLogin').style.display='none';
+      const loginButton=modal.querySelector('#apiOrdersLogin');if(loginButton)loginButton.style.display='none';
       const latest=data.lastSync?.finishedAt||apiPreviewOrders.map(o=>o.lastSeenAt).filter(Boolean).sort().pop();
       modal.querySelector('#apiOrdersMeta').textContent='Central do dia '+(data.orderDate||'')+' · '+apiPreviewOrders.length+' pedido(s) acompanhados';
       modal.querySelector('#apiDailyLastSync').textContent=latest?'Última consulta concluída: '+new Date(latest).toLocaleString('pt-BR')+' · '+(data.lastSync?.source==='scheduled'?'automática':'manual'):'Consulta concluída agora.';

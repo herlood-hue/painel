@@ -2322,7 +2322,7 @@ document.addEventListener('DOMContentLoaded', () => {
           (o.net!=null&&existingRow.liq==null)||
           (o.productSubtotal!=null&&existingRow.prod==null)
         );
-        const hasMissingImage=duplicate&&['SH','ML'].includes(site)&&Array.isArray(existingRow._rawSkus)&&existingRow._rawSkus.length===items.length&&items.some((it,index)=>String(it.imageUrl||'').trim()&&!String(existingRow._rawSkus[index].imageUrl||'').trim());
+        const hasMissingImage=duplicate&&['SH','ML','NS'].includes(site)&&Array.isArray(existingRow._rawSkus)&&existingRow._rawSkus.length===items.length&&items.some((it,index)=>String(it.imageUrl||'').trim()&&!String(existingRow._rawSkus[index].imageUrl||'').trim());
         const canEnrich=hasMissingImage||hasMissingFinancial;
         const eligible=active&&complete&&(!duplicate||canEnrich);
         const state=canEnrich?'Já importado · completar dados':(duplicate?'Já importado':(!active?'Saiu da fila de pendentes':(!complete?'Dados incompletos':'Novo · pronto para importar')));

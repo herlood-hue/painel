@@ -1476,7 +1476,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function buildPickList() {
     const body=document.getElementById('pickBody'); body.innerHTML='';
     const total=allRows.length; document.getElementById('pickSubtitle').textContent=`${total} pedido${total!==1?'s':''} · ${new Date().toLocaleDateString('pt-BR')}`;
-    const sites=[{id:'SH',label:'Shopee',color:'var(--sh)'},{id:'ML',label:'Mercado Livre',color:'var(--ml)'},{id:'AZ',label:'Amazon',color:'var(--az)'},{id:'EV',label:'Estante Virtual',color:'var(--ev)'}];
+    const sites=[{id:'SH',label:'Shopee',color:'var(--sh)'},{id:'ML',label:'Mercado Livre',color:'var(--ml)'},{id:'AZ',label:'Amazon',color:'var(--az)'},{id:'EV',label:'Estante Virtual',color:'var(--ev)'},{id:'NS',label:'Nuvemshop',color:'var(--ns)'}];
     sites.forEach(site=>{
       const rows=allRows.filter(r=>r.site===site.id); if(!rows.length)return;
       const groups=extractPickGroups(rows); const totalItens=groups.reduce((s,g)=>s+g.qtd,0);
@@ -2127,9 +2127,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── GERAR ARQUIVO HTML ────────────────────────────────────────────────────
   function generatePickPage() {
     if (!allRows.length) { toast('\u26a0 Nenhum pedido carregado'); return; }
-    const sites = ['SH','ML','AZ','EV'];
-    const labels = {SH:'Shopee',ML:'Mercado Livre',AZ:'Amazon',EV:'Estante Virtual'};
-    const colors = {SH:'#f97316',ML:'#facc15',AZ:'#60a5fa',EV:'#4ade80'};
+    const sites = ['SH','ML','AZ','EV','NS'];
+    const labels = {SH:'Shopee',ML:'Mercado Livre',AZ:'Amazon',EV:'Estante Virtual',NS:'Nuvemshop'};
+    const colors = {SH:'#f97316',ML:'#facc15',AZ:'#60a5fa',EV:'#4ade80',NS:'#8b5cf6'};
     let html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Separação ' + new Date().toLocaleDateString('pt-BR') + '</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:sans-serif;background:#0f1117;color:#e8edf5;padding:1rem}h1{font-size:1rem;margin-bottom:1rem;color:#8899bb}.site{background:#161b27;border:1px solid #2a3347;border-radius:10px;margin-bottom:1rem;overflow:hidden}.site-hdr{padding:.5rem .8rem;display:flex;align-items:center;gap:.5rem;background:#1e2535;font-size:.8rem;font-weight:700}.group{border-top:1px solid #2a3347}.group-hdr{padding:.25rem .8rem;font-size:.58rem;font-family:monospace;color:#4f617a}.item{padding:.35rem .8rem .35rem 1.5rem;display:flex;align-items:flex-start;gap:.5rem;border-top:1px solid rgba(255,255,255,.04);cursor:pointer}.item.done{opacity:.35}.item.done .nome{text-decoration:line-through}.check{width:14px;height:14px;border:2px solid #344060;border-radius:3px;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:.6rem}.item.done .check{background:#34c78a;border-color:#34c78a}.nome{font-size:.75rem;flex:1}.loc{font-size:.62rem;font-family:monospace;color:#4f8ef7;padding-top:1px}</style></head><body>';
     html += '<h1>\ud83d\udccb Lista de Separação &mdash; ' + new Date().toLocaleDateString('pt-BR') + ' &mdash; ' + allRows.length + ' pedidos</h1>';
     sites.forEach(s => {
@@ -2244,11 +2244,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const qty=Number(it.quantity)||1,name=String(it.name).trim();
         const sku=String(it.sku||'').trim(),variation=String(it.variation||'').trim();
         names.push(qty>1?qty+' × '+name:name);
-        // Preserva os dados originais para reaplicar a Base de SKUs antes ou depois da importação.
-        // Replica a regra da planilha Shopee: variação preenchida tem prioridade
-        // sobre o SKU e é exibida literalmente, sem passar pelo mapa da Base de SKUs.
-        const useVariation=!!variation;
-        const raw=useVariation?variation:(sku||'S/ SKU');
+        // Shopee mantém a regra original: variação tem prioridade e não passa pelo mapa.
+        // Nos demais marketplaces, prioriza o SKU para localizar o produto na Base de SKUs.
+        const useVariation=site==='SH'&&!!variation;
+        const raw=useVariation?variation:(sku||variation||'S/ SKU');
         rawSkus.push({raw:raw,isVar:useVariation,q:qty,qty:qty,imageUrl:String(it.imageUrl||'').trim()||''});
         const line=Number(it.lineTotal),unit=Number(it.unitPrice);
         if(it.lineTotal!=null&&Number.isFinite(line))productTotal+=line;

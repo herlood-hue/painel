@@ -55,7 +55,7 @@
   --green:#34c78a;--green2:#28a573;
   --red:#f05c5c;--red2:#d44040;
   --yellow:#f0b429;--yellow2:#c99020;
-  --sh:#f97316;--ml:#facc15;--az:#60a5fa;--ev:#4ade80;
+  --sh:#f97316;--ml:#facc15;--az:#60a5fa;--ev:#4ade80;--ns:#a78bfa;
   --dup:#f87171;--radius:10px;
   --font:'Sora',sans-serif;--mono:'JetBrains Mono',monospace;
 }
@@ -85,7 +85,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .mkt-item.has-data{border-color:var(--border2)}
 .mkt-header{display:flex;align-items:center;gap:.5rem;margin-bottom:.45rem}
 .mkt-badge{font-size:.62rem;font-weight:700;font-family:var(--mono);padding:2px 5px;border-radius:4px}
-.badge-sh{background:rgba(249,115,22,.15);color:var(--sh)}.badge-ml{background:rgba(250,204,21,.12);color:var(--ml)}.badge-az{background:rgba(96,165,250,.12);color:var(--az)}.badge-ev{background:rgba(74,222,128,.12);color:var(--ev)}
+.badge-sh{background:rgba(249,115,22,.15);color:var(--sh)}.badge-ml{background:rgba(250,204,21,.12);color:var(--ml)}.badge-az{background:rgba(96,165,250,.12);color:var(--az)}.badge-ev{background:rgba(74,222,128,.12);color:var(--ev)}.badge-ns{background:rgba(167,139,250,.15);color:var(--ns)}
 .mkt-name{font-size:.8rem;font-weight:600;color:var(--text)}.mkt-name a{color:inherit;text-decoration:none}.mkt-name a:hover{color:var(--accent)}
 .mkt-link{font-size:.65rem;color:var(--text3);margin-left:auto}.mkt-link a{color:var(--accent);text-decoration:none;font-family:var(--mono)}
 .mkt-actions{display:flex;gap:.4rem;align-items:center}
@@ -118,7 +118,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .filter-bar{padding:.5rem 1.25rem;border-bottom:1px solid var(--border);display:flex;gap:.4rem;align-items:center;background:var(--bg2);flex-shrink:0;flex-wrap:wrap}
 .filter-btn{padding:.22rem .55rem;font-size:.68rem;font-weight:600;font-family:var(--font);background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:20px;cursor:pointer;transition:all .15s}
 .filter-btn.active{color:#fff;border-color:transparent}
-.filter-btn.all.active{background:var(--accent)}.filter-btn.sh.active{background:var(--sh)}.filter-btn.ml.active{background:#b8960a;color:#0a0800}.filter-btn.az.active{background:var(--az);color:#051020}.filter-btn.ev.active{background:var(--green2);color:#021408}.filter-btn.dup.active{background:var(--dup)}
+.filter-btn.all.active{background:var(--accent)}.filter-btn.sh.active{background:var(--sh)}.filter-btn.ml.active{background:#b8960a;color:#0a0800}.filter-btn.az.active{background:var(--az);color:#051020}.filter-btn.ev.active{background:var(--green2);color:#021408}.filter-btn.ns.active{background:var(--ns);color:#160d2a}.filter-btn.dup.active{background:var(--dup)}
 .filter-btn:hover:not(.active){background:var(--bg4);color:var(--text)}
 .search-wrap{margin-left:auto;position:relative}.search-wrap input{padding:.25rem .6rem .25rem 1.65rem;font-size:.7rem;font-family:var(--font);background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:20px;outline:none;width:165px;transition:all .2s}.search-wrap input:focus{border-color:var(--border2);width:205px}.search-wrap::before{content:'⌕';position:absolute;left:.5rem;top:50%;transform:translateY(-50%);color:var(--text3);font-size:.9rem;pointer-events:none}
 .table-area{flex:1;overflow:auto;min-height:0}
@@ -133,7 +133,7 @@ tbody tr{transition:background .1s}tbody tr:hover{background:var(--bg3)}
 tbody tr.dup-row{background:rgba(248,113,113,.05)}tbody tr.dup-row:hover{background:rgba(248,113,113,.09)}
 tbody tr.hidden-row{display:none}
 .site-badge{font-size:.6rem;font-weight:700;font-family:var(--mono);padding:2px 5px;border-radius:4px;display:inline-block}
-.site-sh{background:rgba(249,115,22,.15);color:var(--sh)}.site-ml{background:rgba(250,204,21,.12);color:var(--ml)}.site-az{background:rgba(96,165,250,.12);color:var(--az)}.site-ev{background:rgba(74,222,128,.12);color:var(--ev)}
+.site-sh{background:rgba(249,115,22,.15);color:var(--sh)}.site-ml{background:rgba(250,204,21,.12);color:var(--ml)}.site-az{background:rgba(96,165,250,.12);color:var(--az)}.site-ev{background:rgba(74,222,128,.12);color:var(--ev)}.site-ns{background:rgba(167,139,250,.15);color:var(--ns)}
 .num-cell{font-family:var(--mono);font-size:.71rem;text-align:right;white-space:nowrap}
 .num-pos{color:var(--green)}.num-neg{color:var(--red)}
 .id-cell{font-family:var(--mono);font-size:.67rem;color:var(--text2);max-width:105px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;transition:background .15s,color .15s;border-radius:4px}
@@ -453,6 +453,7 @@ tr:hover .del-btn{opacity:.7}
       <div class="stat-chip"><div class="dot" style="background:var(--ml)"></div><span class="val" id="stat-ml">0</span><span class="lbl">ML</span></div>
       <div class="stat-chip"><div class="dot" style="background:var(--az)"></div><span class="val" id="stat-az">0</span><span class="lbl">AZ</span></div>
       <div class="stat-chip"><div class="dot" style="background:var(--ev)"></div><span class="val" id="stat-ev">0</span><span class="lbl">EV</span></div>
+      <div class="stat-chip"><div class="dot" style="background:var(--ns)"></div><span class="val" id="stat-ns">0</span><span class="lbl">NS</span></div>
       <div class="stat-chip dup-chip" id="dupChip" style="display:none"><div class="dot"></div><span class="val" id="stat-dup">0</span><span class="lbl">dup.</span></div>
     </div>
     <div class="main-actions">
@@ -469,6 +470,7 @@ tr:hover .del-btn{opacity:.7}
     <button class="filter-btn ml" data-filter="ML">Mercado Livre</button>
     <button class="filter-btn az" data-filter="AZ">Amazon</button>
     <button class="filter-btn ev" data-filter="EV">Estante Virtual</button>
+    <button class="filter-btn ns" data-filter="NS">Nuvemshop</button>
     <button class="filter-btn dup" data-filter="DUP" id="filterDupBtn" style="display:none">⚠ Duplicatas</button>
     <div class="search-wrap"><input type="text" id="searchInput" placeholder="Buscar pedido, produto…"></div>
   </div>
@@ -1066,12 +1068,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateStats() {
     document.getElementById('stat-total').textContent=allRows.length;
-    ['SH','ML','AZ','EV'].forEach(s=>{
+    ['SH','ML','AZ','EV','NS'].forEach(s=>{
       document.getElementById('stat-'+s.toLowerCase()).textContent=allRows.filter(r=>r.site===s).length;
       const n=allRows.filter(r=>r.site===s).length;
       const el=document.getElementById('count-'+s); el.textContent=n>0?`${n} pedido${n>1?'s':''} carregado${n>1?'s':''}`:'';
       const mktId={SH:'mkt-sh',ML:'mkt-ml',AZ:'mkt-az',EV:'mkt-ev'}[s];
-      document.getElementById(mktId).classList.toggle('has-data',n>0);
+      if(mktId)document.getElementById(mktId)?.classList.toggle('has-data',n>0);
     });
     const dups=allRows.filter(r=>r.isDup).length;
     document.getElementById('stat-dup').textContent=dups;
@@ -1097,7 +1099,7 @@ document.addEventListener('DOMContentLoaded', () => {
       tr.dataset.search=[d.id,d.nome,d.sku,d.site].join(' ').toLowerCase();
       if(d.isDup)tr.classList.add('dup-row'); tr.draggable=true;
       const dupIcon=d.isDup?`<span class="dup-icon" title="Possível duplicata">⚠</span>`:'';
-      const siteCls={SH:'site-sh',ML:'site-ml',AZ:'site-az',EV:'site-ev'}[d.site]||'';
+      const siteCls={SH:'site-sh',ML:'site-ml',AZ:'site-az',EV:'site-ev',NS:'site-ns'}[d.site]||'';
       const liqVal=d.liq!=null?fmt(d.liq):''; const liqClass=d.liq!=null?(d.liq>=0?'num-pos':'num-neg'):'';
       const nomeParts=d.nome.split('\n');
       const nomeHtml=nomeParts.length>1?nomeParts.map((n,i)=>i<nomeParts.length-1?`${n}<span class="nome-sep">;</span>`:n).join(''):d.nome;
@@ -1474,7 +1476,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function buildPickList() {
     const body=document.getElementById('pickBody'); body.innerHTML='';
     const total=allRows.length; document.getElementById('pickSubtitle').textContent=`${total} pedido${total!==1?'s':''} · ${new Date().toLocaleDateString('pt-BR')}`;
-    const sites=[{id:'SH',label:'Shopee',color:'var(--sh)'},{id:'ML',label:'Mercado Livre',color:'var(--ml)'},{id:'AZ',label:'Amazon',color:'var(--az)'},{id:'EV',label:'Estante Virtual',color:'var(--ev)'}];
+    const sites=[{id:'SH',label:'Shopee',color:'var(--sh)'},{id:'ML',label:'Mercado Livre',color:'var(--ml)'},{id:'AZ',label:'Amazon',color:'var(--az)'},{id:'EV',label:'Estante Virtual',color:'var(--ev)'},{id:'NS',label:'Nuvemshop',color:'var(--ns)'}];
     sites.forEach(site=>{
       const rows=allRows.filter(r=>r.site===site.id); if(!rows.length)return;
       const groups=extractPickGroups(rows); const totalItens=groups.reduce((s,g)=>s+g.qtd,0);
@@ -1993,10 +1995,10 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const now = new Date();
       const sessionId = 'sess_' + Date.now();
-      const colorMap = {SH:'#f97316',ML:'#facc15',AZ:'#60a5fa',EV:'#4ade80'};
-      const labelMap = {SH:'Shopee',ML:'Mercado Livre',AZ:'Amazon',EV:'Estante Virtual'};
+      const colorMap = {SH:'#f97316',ML:'#facc15',AZ:'#60a5fa',EV:'#4ade80',NS:'#a78bfa'};
+      const labelMap = {SH:'Shopee',ML:'Mercado Livre',AZ:'Amazon',EV:'Estante Virtual',NS:'Nuvemshop'};
       const sitesData = [];
-      ['SH','ML','AZ','EV'].forEach(s => {
+      ['SH','ML','AZ','EV','NS'].forEach(s => {
         const rows = allRows.filter(r => r.site === s); if (!rows.length) return;
         const groups = extractPickGroups(rows);
         // qtd = unidades físicas (3 = 1×Produto A + 2×Produto B). itens.length = linhas
@@ -2125,9 +2127,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── GERAR ARQUIVO HTML ────────────────────────────────────────────────────
   function generatePickPage() {
     if (!allRows.length) { toast('\u26a0 Nenhum pedido carregado'); return; }
-    const sites = ['SH','ML','AZ','EV'];
-    const labels = {SH:'Shopee',ML:'Mercado Livre',AZ:'Amazon',EV:'Estante Virtual'};
-    const colors = {SH:'#f97316',ML:'#facc15',AZ:'#60a5fa',EV:'#4ade80'};
+    const sites = ['SH','ML','AZ','EV','NS'];
+    const labels = {SH:'Shopee',ML:'Mercado Livre',AZ:'Amazon',EV:'Estante Virtual',NS:'Nuvemshop'};
+    const colors = {SH:'#f97316',ML:'#facc15',AZ:'#60a5fa',EV:'#4ade80',NS:'#a78bfa'};
     let html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Separação ' + new Date().toLocaleDateString('pt-BR') + '</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:sans-serif;background:#0f1117;color:#e8edf5;padding:1rem}h1{font-size:1rem;margin-bottom:1rem;color:#8899bb}.site{background:#161b27;border:1px solid #2a3347;border-radius:10px;margin-bottom:1rem;overflow:hidden}.site-hdr{padding:.5rem .8rem;display:flex;align-items:center;gap:.5rem;background:#1e2535;font-size:.8rem;font-weight:700}.group{border-top:1px solid #2a3347}.group-hdr{padding:.25rem .8rem;font-size:.58rem;font-family:monospace;color:#4f617a}.item{padding:.35rem .8rem .35rem 1.5rem;display:flex;align-items:flex-start;gap:.5rem;border-top:1px solid rgba(255,255,255,.04);cursor:pointer}.item.done{opacity:.35}.item.done .nome{text-decoration:line-through}.check{width:14px;height:14px;border:2px solid #344060;border-radius:3px;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:.6rem}.item.done .check{background:#34c78a;border-color:#34c78a}.nome{font-size:.75rem;flex:1}.loc{font-size:.62rem;font-family:monospace;color:#4f8ef7;padding-top:1px}</style></head><body>';
     html += '<h1>\ud83d\udccb Lista de Separação &mdash; ' + new Date().toLocaleDateString('pt-BR') + ' &mdash; ' + allRows.length + ' pedidos</h1>';
     sites.forEach(s => {
@@ -2259,7 +2261,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const apiCommission=o.commission!=null&&Number.isFinite(Number(o.commission))?Number(o.commission):null;
       const apiCommissionPct=o.commissionPct!=null&&Number.isFinite(Number(o.commissionPct))?Number(o.commissionPct):null;
       const apiNet=o.net!=null&&Number.isFinite(Number(o.net))?Number(o.net):null;
-      prepared.push({site:site,id:site==='ML'?'#'+externalId:externalId,prod:apiProductSubtotal,frete:0,total:apiProductSubtotal,nome:names.join('\\n'),status:'PAGO',cod:site,sku:skuDisplay,comm:apiCommission,commPct:apiCommissionPct,liq:apiNet,_apiImported:true,_apiItems:items,_rawSkus:rawSkus});
+      const apiTotal=o.total!=null&&Number.isFinite(Number(o.total))?Number(o.total):apiProductSubtotal;
+      const apiFreight=o.total!=null&&o.productSubtotal!=null&&Number.isFinite(Number(o.total))&&Number.isFinite(Number(o.productSubtotal))?Number(o.total)-Number(o.productSubtotal):null;
+      prepared.push({site:site,id:site==='ML'?'#'+externalId:externalId,prod:apiProductSubtotal,frete:apiFreight,total:apiTotal,nome:names.join('\\n'),status:String(o.orderStatus||'—'),cod:site,sku:skuDisplay,comm:apiCommission,commPct:apiCommissionPct,liq:apiNet,_apiImported:true,_apiItems:items,_rawSkus:rawSkus});
       existing.add(idKey);
     });
     if(!prepared.length&&!enriched){modal.querySelector('#apiOrdersFeedback').textContent='Nenhum pedido novo ou imagem pendente para atualizar. '+duplicates.join(' · ');return;}
@@ -2297,7 +2301,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data=await response.json();apiPreviewOrders=Array.isArray(data.orders)?data.orders:[];
       const mkt=(run.marketplaces||[]).map(m=>m.marketplace+': '+m.count+(m.error?' (erro na consulta)':'')).join(' · ');
       feedback.textContent=(run.success?'Consulta concluída. ':'Consulta parcial. ')+(mkt||'Nenhum marketplace retornou dados.');
-      modal.querySelector('#apiOrdersLogin').style.display='none';
+      const loginButton=modal.querySelector('#apiOrdersLogin');if(loginButton)loginButton.style.display='none';
       const latest=data.lastSync?.finishedAt||apiPreviewOrders.map(o=>o.lastSeenAt).filter(Boolean).sort().pop();
       modal.querySelector('#apiOrdersMeta').textContent='Central do dia '+(data.orderDate||'')+' · '+apiPreviewOrders.length+' pedido(s) acompanhados';
       modal.querySelector('#apiDailyLastSync').textContent=latest?'Última consulta concluída: '+new Date(latest).toLocaleString('pt-BR')+' · '+(data.lastSync?.source==='scheduled'?'automática':'manual'):'Consulta concluída agora.';

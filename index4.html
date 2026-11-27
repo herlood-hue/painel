@@ -1995,10 +1995,10 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const now = new Date();
       const sessionId = 'sess_' + Date.now();
-      const colorMap = {SH:'#f97316',ML:'#facc15',AZ:'#60a5fa',EV:'#4ade80'};
-      const labelMap = {SH:'Shopee',ML:'Mercado Livre',AZ:'Amazon',EV:'Estante Virtual'};
+      const colorMap = {SH:'#f97316',ML:'#facc15',AZ:'#60a5fa',EV:'#4ade80',NS:'#8b5cf6'};
+      const labelMap = {SH:'Shopee',ML:'Mercado Livre',AZ:'Amazon',EV:'Estante Virtual',NS:'Nuvemshop'};
       const sitesData = [];
-      ['SH','ML','AZ','EV'].forEach(s => {
+      ['SH','ML','AZ','EV','NS'].forEach(s => {
         const rows = allRows.filter(r => r.site === s); if (!rows.length) return;
         const groups = extractPickGroups(rows);
         // qtd = unidades físicas (3 = 1×Produto A + 2×Produto B). itens.length = linhas
